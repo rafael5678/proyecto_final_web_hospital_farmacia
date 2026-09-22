@@ -1,5 +1,5 @@
 # ---------- Build ----------
-FROM eclipse-temurin:17-jdk AS build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 
 COPY mvnw pom.xml ./
@@ -10,7 +10,7 @@ COPY src ./src
 RUN ./mvnw -q -DskipTests package
 
 # ---------- Runtime ----------
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S hospy && adduser -S hospy -G hospy

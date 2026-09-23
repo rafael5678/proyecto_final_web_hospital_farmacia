@@ -1,9 +1,21 @@
-# Copia este archivo como application-local.properties (no lo subas a git)
-# Render PostgreSQL - usa la URL EXTERNA con puerto 5432
+# ============================================================
+# Copia este archivo como: application-local.properties
+# NO lo subas a git — contiene credenciales (ya está en .gitignore)
+# ============================================================
 
-spring.datasource.url=jdbc:postgresql://HOST.render.com:5432/NOMBRE_DB?sslmode=require
+# ---------- OPCIÓN 1: Base de datos LOCAL con Docker ----------
+# Levántala con: docker compose up -d postgres
+spring.datasource.url=jdbc:postgresql://localhost:5432/medico_db
 spring.datasource.username=medico_user
-spring.datasource.password=TU_PASSWORD_DE_RENDER
+spring.datasource.password=Hospy2024!
 
-jwt.secret=TuClaveSecretaJWTMinimo32Caracteres
+# ---------- OPCIÓN 2: Base de datos REMOTA en Render ----------
+# Descomenta y usa la URL EXTERNA con sslmode=require
+# (para conectar desde tu PC / DBeaver / Postman)
+#spring.datasource.url=jdbc:postgresql://dpg-daq5eomgekts73blio0g-a.oregon-postgres.render.com:5432/NOMBRE_DB?sslmode=require
+#spring.datasource.username=medico_user
+#spring.datasource.password=TU_PASSWORD_DE_RENDER
+
+# ---------- JWT y CORS ----------
+jwt.secret=TuClaveSecretaJWTMinimo32Caracteres1234567890
 app.cors.allowed-origins=http://localhost:4200,https://tu-app.vercel.app

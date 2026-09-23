@@ -47,7 +47,7 @@ export class LoginComponent implements OnInit {
     }
     if (this.route.snapshot.queryParamMap.get('sesionExpirada') === '1') {
       if (this.portal === 'admin') {
-        this.error.set('Sesión cerrada por seguridad: 10 segundos sin actividad.');
+        this.error.set('Sesión cerrada por seguridad: 10 minutos sin actividad.');
       } else if (this.portal === 'medico') {
         this.error.set('Sesión cerrada por seguridad: 7 minutos sin actividad.');
       }

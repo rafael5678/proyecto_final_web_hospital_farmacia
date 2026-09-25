@@ -45,8 +45,9 @@
       <div><label>Teléfono emergencia</label><input class="input" [(ngModel)]="telefonoEmergencia" name="telefonoEmergencia" /></div>
       <div class="full"><label>Observaciones médicas</label><textarea class="input" rows="2" [(ngModel)]="observaciones" name="observaciones"></textarea></div>
 
+      @if (wakingServer()) { <p class="info-msg full">⏳ Conectando con el servidor (Render Free)... espere un momento</p> }
       @if (error()) { <p class="error-msg full">{{ error() }}</p> }
-      <button class="btn btn-primary full" type="submit" [disabled]="loading()">
+      <button class="btn btn-primary full" type="submit" [disabled]="loading() || wakingServer()">
         {{ loading() ? 'Registrando...' : 'Registrarse' }}
       </button>
     </form>

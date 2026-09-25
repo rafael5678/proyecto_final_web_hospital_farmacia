@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-registro',
@@ -10,7 +11,7 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './registro.component.html',
   styleUrl: './registro.component.css'
 })
-export class RegistroComponent {
+export class RegistroComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
 
@@ -31,6 +32,16 @@ export class RegistroComponent {
   observaciones = '';
   error = signal('');
   loading = signal(false);
+  wakingServer = signal(false);
+
+  ngOnInit() {
+    if (environment.production) {
+      this.wakingServer.set(true);
+      fetch(`${environment.apiUrl}/health`)
+        .catch(() => {})
+        .finally(() => this.wakingServer.set(false));
+    }
+  }
 
   onSubmit() {
     if (this.password !== this.confirmPassword) {

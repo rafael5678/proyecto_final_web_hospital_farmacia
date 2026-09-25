@@ -51,6 +51,16 @@ a { text-decoration: none; color: inherit; }
   margin-top: 0.5rem;
 }
 
+.info-msg {
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
 .portal-layout {
   min-height: 100vh;
   display: flex;

@@ -1,6 +1,6 @@
 /**
  * Genera environment.prod.ts desde la variable API_URL (Vercel / CI).
- * Ejemplo en Vercel: API_URL=https://hospy-api.onrender.com/api
+ * Ejemplo en Vercel: API_URL=https://farmacia-hospital-api.onrender.com/api
  */
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -10,11 +10,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const out = join(__dirname, '..', 'src', 'environments', 'environment.prod.ts');
 
 const apiUrl = (process.env.API_URL || '').trim().replace(/\/$/, '');
-const fallback = 'https://hospy-api.onrender.com/api';
+const fallback = 'https://farmacia-hospital-api.onrender.com/api';
 
 if (!apiUrl && process.env.VERCEL === '1') {
   console.warn(
-    '[set-api-url] API_URL no está definida en Vercel. Usando placeholder:',
+    '[set-api-url] API_URL no está definida en Vercel. Usando fallback:',
     fallback
   );
 }

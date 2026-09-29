@@ -155,6 +155,229 @@
           </table>
         }
       }
+
+      @if (tab() === 'iasuperv') {
+        <section class="card section ai-panel">
+          <header class="section-head">
+            <h2 class="section-title">🤖 Supervisión global de IA Hospitalaria</h2>
+            <span class="chip-outline demo">Monitoreo · Métricas · Estado</span>
+          </header>
+
+          @if (aiStatus(); as st) {
+            <div class="ai-status-bar">
+              <span class="severity-chip" [class]="st.apiKeyActiva ? 'bg-green' : 'bg-red'">
+                {{ st.apiKeyActiva ? '✓ API KEY ACTIVA' : '✗ SIN API KEY (MODO DEMO)' }}
+              </span>
+              <span class="chip-outline">{{ st.version }}</span>
+            </div>
+          }
+
+          <h3 style="margin-top: 1.5rem;">📊 Análisis totales procesados por la IA</h3>
+          <div class="stats-grid ai-stats">
+            <div class="stat ai-stat">
+              <div class="ai-stat-icon triage-icon">🎯</div>
+              <div>
+                <span>Triage NLP (BERT)</span>
+                <strong>{{ totalAnalisis().triage }}</strong>
+              </div>
+              <small class="ai-stat-desc">Síntomas · ESI/MTS · Prioridad</small>
+            </div>
+            <div class="stat ai-stat">
+              <div class="ai-stat-icon derma-icon">🔬</div>
+              <div>
+                <span>Dermatología CNN</span>
+                <strong>{{ totalAnalisis().dermatologia }}</strong>
+              </div>
+              <small class="ai-stat-desc">ResNet/EfficientNet · Lesiones</small>
+            </div>
+            <div class="stat ai-stat">
+              <div class="ai-stat-icon soap-icon">📝</div>
+              <div>
+                <span>Escriba SOAP</span>
+                <strong>{{ totalAnalisis().soap }}</strong>
+              </div>
+              <small class="ai-stat-desc">Whisper + NER clínico</small>
+            </div>
+            <div class="stat ai-stat">
+              <div class="ai-stat-icon inter-icon">🧬</div>
+              <div>
+                <span>Interacciones GNN</span>
+                <strong>{{ totalAnalisis().interacciones }}</strong>
+              </div>
+              <small class="ai-stat-desc">DrugBank · Fármaco-Alimento</small>
+            </div>
+            <div class="stat ai-stat">
+              <div class="ai-stat-icon price-icon">💰</div>
+              <div>
+                <span>Triangulación precios</span>
+                <strong>{{ totalAnalisis().precios }}</strong>
+              </div>
+              <small class="ai-stat-desc">Isolation Forest + Prophet</small>
+            </div>
+          </div>
+
+          <div class="ai-supervision-grid">
+            <div class="card inner ai-superv-card triage">
+              <h4>🎯 Triage activo NLP</h4>
+              <ul>
+                <li>✅ Inferencia severidad ESI/MTS 5 niveles</li>
+                <li>✅ Especialidad automática</li>
+                <li>✅ Prioridad 1-10 · Recomendaciones</li>
+                <li>✅ Procesamiento síntomas dictados</li>
+              </ul>
+              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
+            </div>
+
+            <div class="card inner ai-superv-card derma">
+              <h4>🔬 Predermatología (Visión)</h4>
+              <ul>
+                <li>✅ CNN ResNet/EfficientNet</li>
+                <li>✅ Score riesgo 0.0 - 1.0</li>
+                <li>✅ Diagnósticos diferenciales</li>
+                <li>✅ Reporte pre-consulta</li>
+              </ul>
+              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
+            </div>
+
+            <div class="card inner ai-superv-card soap">
+              <h4>📝 Escriba médico SOAP</h4>
+              <ul>
+                <li>✅ Speech-to-text Whisper/DeepSpeech</li>
+                <li>✅ NER clínico extracción entidades</li>
+                <li>✅ Formato S / O / A / P</li>
+                <li>✅ Dx presuntivo + procedimientos</li>
+              </ul>
+              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
+            </div>
+
+            <div class="card inner ai-superv-card inter">
+              <h4>🧬 Grafos fármaco-alimento</h4>
+              <ul>
+                <li>✅ Graph Neural Network (GNN)</li>
+                <li>✅ Integración DrugBank</li>
+                <li>✅ 5 niveles riesgo global</li>
+                <li>✅ Alertas + recomendaciones dieta</li>
+              </ul>
+              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
+            </div>
+
+            <div class="card inner ai-superv-card price">
+              <h4>💰 Triangulación precios</h4>
+              <ul>
+                <li>✅ Isolation Forest anomalías</li>
+                <li>✅ Prophet series tiempo</li>
+                <li>✅ Comparativa farmacias locales</li>
+                <li>✅ Detección desabastecimiento artificial</li>
+              </ul>
+              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
+            </div>
+
+            <div class="card inner ai-superv-card sec">
+              <h4>🔐 Seguridad sesiones</h4>
+              <ul>
+                <li>⏱ Médicos: <strong>5 min</strong> inactividad</li>
+                <li>⏱ Administradores: <strong>10 s</strong> inactividad</li>
+                <li>✅ JWT interceptores</li>
+                <li>✅ Guards de rol y autenticación</li>
+              </ul>
+              <p class="status-row ok">Estado: <strong>Activo</strong></p>
+            </div>
+          </div>
+        </section>
+      }
+
+      @if (tab() === 'preciosauditoria') {
+        <section class="card section ai-panel">
+          <header class="section-head">
+            <h2 class="section-title">💰 Auditoría de precios · Isolation Forest + Prophet</h2>
+            <span class="chip-outline demo">Detección de sobreprecios y desabastecimiento</span>
+          </header>
+
+          <div class="form-grid">
+            <div>
+              <label>Medicamento</label>
+              <input class="input" type="text" [(ngModel)]="preciosReq.medicamento" placeholder="Ej: Atorvastatina" />
+            </div>
+            <div>
+              <label>Presentación</label>
+              <input class="input" type="text" [(ngModel)]="preciosReq.presentacion" placeholder="Ej: 20mg · caja x30" />
+            </div>
+            <div>
+              <label>Precio reportado (COP)</label>
+              <input class="input" type="number" [(ngModel)]="preciosPrecioTxt" placeholder="Ej: 45000" />
+            </div>
+            <div>
+              <label>Ciudad</label>
+              <input class="input" type="text" [(ngModel)]="preciosReq.ciudad" placeholder="Bogotá, Medellín…" />
+            </div>
+          </div>
+
+          <div class="actions-bar">
+            <button type="button" class="btn btn-purple" [disabled]="preciosLoading()" (click)="preciosAnalizar()">
+              {{ preciosLoading() ? 'Analizando mercado…' : '🔍 Auditar y triangular precio' }}
+            </button>
+            @if (preciosRsp()?.modoDemo) { <span class="severity-chip bg-orange">MODO DEMO</span> }
+            @if (error()) { <span class="warn-big">{{ error() }}</span> }
+          </div>
+
+          @if (preciosRsp(); as r) {
+            <div class="ai-result">
+              <div class="severity-row">
+                <span class="severity-chip" [class]="severidadSobreprecioColor(r.evaluacionSobreprecio)">
+                  {{ severidadSobreprecioLabel(r.evaluacionSobreprecio) }}
+                </span>
+                <span class="severity-chip bg-blue">Desviación: {{ r.porcentajeDesviacion | number:'1.1-1' }}%</span>
+                @if (r.evaluacionSobreprecio?.toUpperCase() === 'DESABASTECIMIENTO_ARTIFICIAL') {
+                  <span class="severity-chip bg-red">⚠ SOSPECHA DESABASTECIMIENTO</span>
+                }
+              </div>
+
+              <div class="card inner" style="margin-top: 1rem;">
+                <p style="margin: 0 0 0.5rem 0;"><strong>Recomendación:</strong> {{ r.recomendacion }}</p>
+                @if (r.alertas && r.alertas.length > 0) {
+                  <div style="margin-top: 0.75rem;">
+                    <strong style="font-size: 0.9rem;">Alertas detectadas:</strong>
+                    <ul style="margin: 0.35rem 0 0; padding-left: 1.25rem;">
+                      @for (a of r.alertas; track $index) { <li>{{ a }}</li> }
+                    </ul>
+                  </div>
+                }
+              </div>
+
+              <div class="price-row">
+                <div><span>Mínimo esperado</span><strong>${{ r.precioEsperadoMin | number }}</strong></div>
+                <div><span>Promedio mercado</span><strong>${{ r.precioPromedio | number }}</strong></div>
+                <div><span>Máximo esperado</span><strong>${{ r.precioEsperadoMax | number }}</strong></div>
+              </div>
+
+              <h4 style="margin-top: 1rem;">🏥 Comparativa por establecimiento</h4>
+              <table>
+                <thead>
+                  <tr><th>Farmacia</th><th>Precio</th><th>Disponibilidad</th><th>Enlace</th></tr>
+                </thead>
+                <tbody>
+                  @for (f of r.comparativa; track f.nombre) {
+                    <tr>
+                      <td>{{ f.nombre }}</td>
+                      <td>${{ f.precio | number }}</td>
+                      <td><span class="severity-chip" [class]="(f.disponibilidad || '').toUpperCase().includes('DISPONIBLE') ? 'bg-green' : 'bg-orange'">
+                        {{ f.disponibilidad || 'N/A' }}
+                      </span></td>
+                      <td>
+                        @if (f.url) {
+                          <a [href]="f.url" target="_blank" rel="noopener" style="color:#7c3aed; font-weight:600;">Ver →</a>
+                        } @else {
+                          <span style="color:#94a3b8;">—</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+      }
     </main>
   </div>
 </div>

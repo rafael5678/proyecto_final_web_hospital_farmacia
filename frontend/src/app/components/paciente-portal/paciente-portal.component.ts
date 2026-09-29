@@ -3,14 +3,23 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { PacienteService } from '../../services/paciente.service';
+import { AiService } from '../../services/ai.service';
 import { Cita } from '../../models/cita.model';
 import { Usuario } from '../../models/usuario.model';
 import { Horario } from '../../models/horario.model';
 import { PacienteDashboard, PacientePerfil } from '../../models/paciente-perfil.model';
+import {
+  AiDermatologiaRequest, AiDermatologiaResponse,
+  AiInteraccionRequest, AiInteraccionResponse,
+  AiPreciosRequest, AiPreciosResponse,
+  AiTriageRequest, AiTriageResponse
+} from '../../models/ai.model';
 import { PortalSidebarComponent, SidebarItem } from '../portal-sidebar/portal-sidebar.component';
 
-type PacienteTab = 'inicio' | 'agendar' | 'historial' | 'proximas' | 'medicos' | 'perfil';
-type PacienteSub = '' | 'agendar' | 'historial' | 'proximas' | 'directorio' | 'editar';
+type PacienteTab = 'inicio' | 'agendar' | 'historial' | 'proximas' | 'medicos' | 'perfil'
+  | 'triage' | 'dermatologia' | 'interacciones' | 'precios';
+type PacienteSub = '' | 'agendar' | 'historial' | 'proximas' | 'directorio' | 'editar'
+  | 'triage' | 'derm' | 'inter' | 'precios';
 
 @Component({
   selector: 'app-paciente-portal',
@@ -22,10 +31,11 @@ type PacienteSub = '' | 'agendar' | 'historial' | 'proximas' | 'directorio' | 'e
 export class PacientePortalComponent implements OnInit {
   auth = inject(AuthService);
   private svc = inject(PacienteService);
+  private ai = inject(AiService);
 
   tab = signal<PacienteTab>('inicio');
   sub = signal<PacienteSub>('');
-  expandedMenus = signal<string[]>(['citas', 'medicos']);
+  expandedMenus = signal<string[]>(['citas', 'medicos', 'ia', 'medicamentos']);
 
   readonly menuItems: SidebarItem[] = [
     { id: 'inicio', label: 'Inicio', icon: '🏠', tab: 'inicio' },
@@ -45,6 +55,24 @@ export class PacientePortalComponent implements OnInit {
       icon: '🩺',
       children: [
         { id: 'm-dir', label: 'Directorio médicos', tab: 'medicos', sub: 'directorio' }
+      ]
+    },
+    {
+      id: 'ia',
+      label: 'IA Hospitalaria',
+      icon: '🤖',
+      children: [
+        { id: 'ai-triage', label: 'Triage de síntomas', tab: 'triage', sub: 'triage' },
+        { id: 'ai-derm', label: 'Piel / Lesiones', tab: 'dermatologia', sub: 'derm' }
+      ]
+    },
+    {
+      id: 'medicamentos',
+      label: 'Medicamentos',
+      icon: '💊',
+      children: [
+        { id: 'm-inter', label: 'Interacciones fármaco-alimento', tab: 'interacciones', sub: 'inter' },
+        { id: 'm-precios', label: 'Precios y farmacias', tab: 'precios', sub: 'precios' }
       ]
     },
     {
@@ -73,6 +101,29 @@ export class PacientePortalComponent implements OnInit {
   ok = signal('');
   loading = signal(false);
   guardandoPerfil = signal(false);
+
+  /* ======= IA: Triage NLP ======= */
+  triageReq: AiTriageRequest = { sintomas: '', duracion: '', antecedentes: '' };
+  triageRsp = signal<AiTriageResponse | null>(null);
+  triageLoading = signal(false);
+
+  /* ======= IA: Dermatologia CNN ======= */
+  dermReq: AiDermatologiaRequest = { descripcion: '', tiempoEvolucion: '', sintomasAsociados: '' };
+  dermRsp = signal<AiDermatologiaResponse | null>(null);
+  dermLoading = signal(false);
+
+  /* ======= IA: Interacciones GNN ======= */
+  interMed = '';       /* comma list */
+  interDieta = '';     /* comma list */
+  interSuplem = '';    /* comma list */
+  interRsp = signal<AiInteraccionResponse | null>(null);
+  interLoading = signal(false);
+
+  /* ======= IA: Precios / Prophet ======= */
+  preciosReq: AiPreciosRequest = { medicamento: '', presentacion: '', ciudad: '' };
+  preciosPrecioTxt = '';
+  preciosRsp = signal<AiPreciosResponse | null>(null);
+  preciosLoading = signal(false);
 
   ngOnInit() {
     this.cargarInicio();
@@ -110,7 +161,11 @@ export class PacientePortalComponent implements OnInit {
       historial: 'Historial de citas',
       proximas: 'Próximas citas',
       'medicos-directorio': 'Directorio de médicos',
-      'perfil-editar': 'Mi perfil'
+      'perfil-editar': 'Mi perfil',
+      'triage-triage': '🤖 Triage de síntomas (NLP clínico)',
+      'dermatologia-derm': '🤖 Pre-diagnóstico cutáneo (CNN)',
+      'interacciones-inter': '💊 Interacciones fármaco-alimento (GNN)',
+      'precios-precios': '💊 Precios y abastecimiento de medicamentos'
     };
     const key = this.sub() ? `${this.tab()}-${this.sub()}` : this.tab();
     return map[key] ?? map[this.tab()] ?? 'Portal del paciente';
@@ -211,6 +266,88 @@ export class PacientePortalComponent implements OnInit {
     this.tab.set('agendar');
     this.sub.set('agendar');
     this.onMedicoChange();
+  }
+
+  /* ============ Inteligencia Artificial ============ */
+  triageAnalizar() {
+    if (!this.triageReq.sintomas.trim()) {
+      this.error.set('Describe tus síntomas para analizar el triaje.');
+      return;
+    }
+    this.triageLoading.set(true);
+    this.error.set('');
+    this.triageRsp.set(null);
+    this.ai.triage({ ...this.triageReq }).subscribe({
+      next: (r) => { this.triageRsp.set(r); this.triageLoading.set(false); },
+      error: (e) => { this.triageLoading.set(false); this.error.set(e.error?.error ?? 'Error en análisis IA.'); }
+    });
+  }
+
+  dermAnalizar() {
+    if (!this.dermReq.descripcion.trim()) {
+      this.error.set('Describe la lesión o síntoma cutáneo para el análisis.');
+      return;
+    }
+    this.dermLoading.set(true);
+    this.error.set('');
+    this.dermRsp.set(null);
+    this.ai.dermatologia({ ...this.dermReq }).subscribe({
+      next: (r) => { this.dermRsp.set(r); this.dermLoading.set(false); },
+      error: (e) => { this.dermLoading.set(false); this.error.set(e.error?.error ?? 'Error en análisis dermatológico.'); }
+    });
+  }
+
+  interAnalizar() {
+    const meds = this.commaList(this.interMed);
+    if (meds.length === 0) {
+      this.error.set('Ingresa al menos 1 medicamento separado por comas.');
+      return;
+    }
+    const req: AiInteraccionRequest = {
+      medicamentos: meds,
+      dietaHabitual: this.commaList(this.interDieta),
+      suplementos: this.commaList(this.interSuplem)
+    };
+    this.interLoading.set(true);
+    this.error.set('');
+    this.interRsp.set(null);
+    this.ai.interacciones(req).subscribe({
+      next: (r) => { this.interRsp.set(r); this.interLoading.set(false); },
+      error: (e) => { this.interLoading.set(false); this.error.set(e.error?.error ?? 'Error en análisis de interacciones.'); }
+    });
+  }
+
+  preciosAnalizar() {
+    if (!this.preciosReq.medicamento.trim()) {
+      this.error.set('Ingresa el nombre del medicamento a comparar.');
+      return;
+    }
+    const precio = this.preciosPrecioTxt ? parseFloat(this.preciosPrecioTxt) : undefined;
+    const req: AiPreciosRequest = {
+      ...this.preciosReq,
+      precioReportado: !isNaN(precio as number) ? precio : undefined
+    };
+    this.preciosLoading.set(true);
+    this.error.set('');
+    this.preciosRsp.set(null);
+    this.ai.precios(req).subscribe({
+      next: (r) => { this.preciosRsp.set(r); this.preciosLoading.set(false); },
+      error: (e) => { this.preciosLoading.set(false); this.error.set(e.error?.error ?? 'Error en comparativa de precios.'); }
+    });
+  }
+
+  private commaList(s: string): string[] {
+    if (!s) return [];
+    return s.split(/[,;]/).map(x => x.trim()).filter(Boolean);
+  }
+
+  severidadColor(sev: string): string {
+    const s = (sev || '').toLowerCase();
+    if (s.includes('rojo') || s.includes('critico') || s.includes('critica') || s.includes('severo')) return 'bg-red';
+    if (s.includes('naranja') || s.includes('alto')) return 'bg-orange';
+    if (s.includes('amarillo') || s.includes('medio')) return 'bg-yellow';
+    if (s.includes('verde') || s.includes('bajo')) return 'bg-green';
+    return 'bg-blue';
   }
 
   badgeClass(estado: string): string {

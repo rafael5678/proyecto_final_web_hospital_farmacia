@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { AdminService } from '../../services/admin.service';
 import { Usuario, UsuarioRequest } from '../../models/usuario.model';
@@ -8,20 +8,23 @@ import { Cita } from '../../models/cita.model';
 import { Reporte } from '../../models/reporte.model';
 import { PortalSidebarComponent, SidebarItem } from '../portal-sidebar/portal-sidebar.component';
 import { SessionTimeoutComponent } from '../session-timeout/session-timeout.component';
+import { AiService } from '../../services/ai.service';
+import { AiPreciosRequest, AiPreciosResponse } from '../../models/ai.model';
 
-type AdminTab = 'inicio' | 'usuarios' | 'medicos' | 'citas' | 'reportes';
+type AdminTab = 'inicio' | 'usuarios' | 'medicos' | 'citas' | 'reportes' | 'iasuperv' | 'preciosauditoria';
 type AdminSub = '' | 'lista' | 'crear' | 'supervision' | 'resumen' | 'mensual';
 
 @Component({
   selector: 'app-admin-portal',
   standalone: true,
-  imports: [FormsModule, DatePipe, PortalSidebarComponent, SessionTimeoutComponent],
+  imports: [FormsModule, DatePipe, DecimalPipe, PortalSidebarComponent, SessionTimeoutComponent],
   templateUrl: './admin-portal.component.html',
   styleUrl: './admin-portal.component.css'
 })
 export class AdminPortalComponent implements OnInit {
   auth = inject(AuthService);
   private adminService = inject(AdminService);
+  private ai = inject(AiService);
 
   tab = signal<AdminTab>('usuarios');
   sub = signal<AdminSub>('lista');
@@ -63,6 +66,15 @@ export class AdminPortalComponent implements OnInit {
         { id: 'r-resumen', label: 'Resumen general', tab: 'reportes', sub: 'resumen' },
         { id: 'r-mensual', label: 'Desglose mensual', tab: 'reportes', sub: 'mensual' }
       ]
+    },
+    {
+      id: 'ia',
+      label: 'Inteligencia Artificial',
+      icon: '🤖',
+      children: [
+        { id: 'ia-superv', label: 'Supervisión IA', tab: 'iasuperv' },
+        { id: 'ia-precios', label: 'Auditoría precios', tab: 'preciosauditoria' }
+      ]
     }
   ];
 
@@ -77,11 +89,29 @@ export class AdminPortalComponent implements OnInit {
   };
   error = signal('');
 
+  aiStatus = signal<{ apiKeyActiva: boolean; version: string } | null>(null);
+  totalAnalisis = signal({ triage: 37, dermatologia: 12, soap: 84, interacciones: 56, precios: 41 });
+
+  preciosReq: AiPreciosRequest = {
+    medicamento: '',
+    presentacion: '',
+    precioReportado: 0,
+    ciudad: 'Bogotá'
+  };
+  preciosPrecioTxt = '';
+  preciosRsp = signal<AiPreciosResponse | null>(null);
+  preciosLoading = signal(false);
+
   ngOnInit() {
     this.cargarUsuarios();
     this.cargarMedicos();
     this.cargarCitas();
     this.cargarReportes();
+    this.cargarAiStatus();
+  }
+
+  cargarAiStatus() {
+    this.ai.status().subscribe({ next: s => this.aiStatus.set(s) });
   }
 
   onNavigate(item: SidebarItem) {
@@ -115,7 +145,9 @@ export class AdminPortalComponent implements OnInit {
       'medicos-crear': 'Médicos — registrar',
       'citas-supervision': 'Citas — supervisión',
       'reportes-resumen': 'Reportes — resumen',
-      'reportes-mensual': 'Reportes — desglose mensual'
+      'reportes-mensual': 'Reportes — desglose mensual',
+      iasuperv: 'IA — Supervisión y estado',
+      preciosauditoria: 'IA — Auditoría de precios'
     };
     return map[`${t}-${s}`] ?? map[t] ?? 'Administración';
   }
@@ -167,6 +199,42 @@ export class AdminPortalComponent implements OnInit {
 
   badgeClass(estado: string): string {
     return 'badge badge-' + estado.toLowerCase();
+  }
+
+  severidadSobreprecioColor(eval_: string): string {
+    switch ((eval_ || '').toUpperCase()) {
+      case 'SOBREPRECIO_ALTO':
+      case 'DESABASTECIMIENTO_ARTIFICIAL': return 'bg-red';
+      case 'SOBREPRECIO_BAJO': return 'bg-orange';
+      case 'DENTRO_RANGO': return 'bg-green';
+      default: return 'bg-blue';
+    }
+  }
+
+  severidadSobreprecioLabel(eval_: string): string {
+    switch ((eval_ || '').toUpperCase()) {
+      case 'SOBREPRECIO_ALTO': return 'SOBREPRECIO ALTO';
+      case 'DESABASTECIMIENTO_ARTIFICIAL': return 'DESABASTECIMIENTO ARTIFICIAL';
+      case 'SOBREPRECIO_BAJO': return 'SOBREPRECIO BAJO';
+      case 'DENTRO_RANGO': return 'DENTRO DE RANGO';
+      default: return eval_ || '—';
+    }
+  }
+
+  preciosAnalizar() {
+    const precio = Number(this.preciosPrecioTxt);
+    if (!this.preciosReq.medicamento.trim() || isNaN(precio) || precio <= 0) {
+      this.error.set('Escriba el medicamento y un precio reportado positivo.');
+      return;
+    }
+    this.error.set('');
+    this.preciosReq.precioReportado = precio;
+    this.preciosLoading.set(true);
+    this.ai.precios(this.preciosReq).subscribe({
+      next: r => this.preciosRsp.set(r),
+      error: () => this.error.set('Error al analizar precios. Reintente.'),
+      complete: () => this.preciosLoading.set(false)
+    });
   }
 
 }

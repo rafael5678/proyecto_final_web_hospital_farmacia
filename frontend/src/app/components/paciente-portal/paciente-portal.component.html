@@ -176,6 +176,157 @@
           </button>
         </div>
       }
+
+      @if (tab() === 'triage') {
+        <div class="card section form-grid ai-panel">
+          <h2 class="section-title">🤖 Triage inteligente (NLP / MTS · ESI)</h2>
+          <p class="info-msg">Describe tus síntomas en lenguaje natural — nuestro modelo BERT/RoBERTa clínico infiere severidad, especialidad y prioridad.</p>
+          <div class="full"><label>Síntomas *</label><textarea class="input big" rows="5" [(ngModel)]="triageReq.sintomas" placeholder="Ej: dolor de cabeza fuerte desde ayer, fiebre de 38.5, mareos al levantarme..."></textarea></div>
+          <div><label>Duración aproximada</label><input class="input" [(ngModel)]="triageReq.duracion" placeholder="Ej: 48 horas, 1 semana..." /></div>
+          <div><label>Edad</label><input class="input" type="number" [(ngModel)]="triageReq.edadPaciente" /></div>
+          <div class="full"><label>Antecedentes / alergias conocidas</label><textarea class="input" rows="3" [(ngModel)]="triageReq.antecedentes" placeholder="Hipertensión, asma, diabetes, alergia a penicilina..."></textarea></div>
+          <div class="full">
+            <button type="button" class="btn btn-green full" (click)="triageAnalizar()" [disabled]="triageLoading()">
+              {{ triageLoading() ? 'Analizando síntomas...' : '🔬 Analizar con IA' }}
+            </button>
+          </div>
+
+          @if (triageRsp(); as t) {
+            <div class="ai-result">
+              <div class="severity-row">
+                <span class="severity-chip" [class]="severidadColor(t.severidad)">{{ t.severidad }}</span>
+                <span class="chip-outline">ESI nivel {{ t.nivelEsi }}</span>
+                <span class="chip-outline">Prioridad {{ t.prioridad }}/10</span>
+                <span class="chip-outline">Especialidad: {{ t.especialidadRecomendada }}</span>
+                @if (t.modoDemo) { <span class="chip-outline demo">MODO DEMO</span> }
+              </div>
+              <p><strong>Resumen:</strong> {{ t.resumen }}</p>
+              <p><strong>Escala usada:</strong> {{ t.escala }}</p>
+              <p><strong>Hallazgos:</strong></p>
+              <ul> @for (h of t.hallazgos; track h) { <li>{{ h }}</li> } </ul>
+              <div class="reco"><strong>Recomendaciones:</strong><br/>{{ t.recomendaciones }}</div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (tab() === 'dermatologia') {
+        <div class="card section form-grid ai-panel">
+          <h2 class="section-title">🤖 Pre-diagnóstico cutáneo (ResNet / EfficientNet)</h2>
+          <p class="info-msg">Describe la lesión. Nuestra CNN analiza características (asimetría, bordes, color, diámetro, evolución) y reporta riesgo.</p>
+          <div class="full"><label>Descripción de la lesión *</label><textarea class="input big" rows="5" [(ngModel)]="dermReq.descripcion" placeholder="Ej: Mancha marrón de 6mm en el brazo, apareció hace 2 meses, pica un poco, asimétrica, bordes irregulares..."></textarea></div>
+          <div><label>Tiempo de evolución</label><input class="input" [(ngModel)]="dermReq.tiempoEvolucion" placeholder="2 semanas, 3 meses..." /></div>
+          <div><label>Síntomas asociados</label><input class="input" [(ngModel)]="dermReq.sintomasAsociados" placeholder="Picor, ardor, sangrado..."></div>
+          <div class="full">
+            <button type="button" class="btn btn-green full" (click)="dermAnalizar()" [disabled]="dermLoading()">
+              {{ dermLoading() ? 'Analizando lesión...' : '🔬 Analizar con IA' }}
+            </button>
+          </div>
+
+          @if (dermRsp(); as d) {
+            <div class="ai-result">
+              <div class="severity-row">
+                <span class="severity-chip" [class]="severidadColor(d.nivelRiesgo)">RIESGO {{ d.nivelRiesgo }}</span>
+                <span class="chip-outline">Score: {{ (d.scoreRiesgo * 100).toFixed(1) }}%</span>
+                @if (d.modoDemo) { <span class="chip-outline demo">MODO DEMO</span> }
+              </div>
+              <p class="warn-big"><strong>⚠️ {{ d.advertencia }}</strong></p>
+              <p><strong>Diagnósticos diferenciales:</strong></p>
+              <ul> @for (dx of d.diagnosticosDiferenciales; track dx) { <li>{{ dx }}</li> } </ul>
+              <p><strong>Características observadas:</strong></p>
+              <ul> @for (c of d.caracteristicasObservadas; track c) { <li>{{ c }}</li> } </ul>
+              <div class="reco"><strong>Recomendaciones:</strong><br/>{{ d.recomendaciones }}</div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (tab() === 'interacciones') {
+        <div class="card section form-grid ai-panel">
+          <h2 class="section-title">💊 Interacciones Fármaco + Alimento (GNN DrugBank)</h2>
+          <p class="info-msg">Nuestra Graph Neural Network evalúa interacciones graves entre tus medicamentos, dieta y suplementos. Escribe listas separadas por coma.</p>
+          <div class="full"><label>Medicamentos que consumes (separados por coma) *</label><textarea class="input" rows="3" [(ngModel)]="interMed" placeholder="Atorvastatina 20mg, Warfarina 5mg, Omeprazol..."></textarea></div>
+          <div class="full"><label>Dieta habitual / alimentos que consumes frecuentemente</label><textarea class="input" rows="3" [(ngModel)]="interDieta" placeholder="Jugo de toronja, espinaca, brócoli, lácteos, alcohol..."></textarea></div>
+          <div class="full"><label>Suplementos o vitaminas</label><textarea class="input" rows="2" [(ngModel)]="interSuplem" placeholder="Vitamina K, Omega 3, Magnesio..."></textarea></div>
+          <div class="full">
+            <button type="button" class="btn btn-green full" (click)="interAnalizar()" [disabled]="interLoading()">
+              {{ interLoading() ? 'Evaluando grafo de interacciones...' : '🔬 Evaluar con IA' }}
+            </button>
+          </div>
+
+          @if (interRsp(); as g) {
+            <div class="ai-result">
+              <div class="severity-row">
+                <span class="severity-chip" [class]="severidadColor(g.nivelRiesgoGlobal)">RIESGO GLOBAL: {{ g.nivelRiesgoGlobal }}</span>
+                <span class="chip-outline">{{ g.alertas.length }} alerta(s)</span>
+                @if (g.modoDemo) { <span class="chip-outline demo">MODO DEMO</span> }
+              </div>
+              <p><strong>Resumen:</strong> {{ g.resumen }}</p>
+              <h3>Alertas:</h3>
+              @for (a of g.alertas; track a.elementos + a.severidad) {
+                <div class="alerta-card" [class]="severidadColor(a.severidad)">
+                  <div class="alerta-head"><strong>{{ a.elementos }}</strong> · <em>{{ a.tipo }}</em> · <span class="sev">{{ a.severidad }}</span></div>
+                  <p><strong>Mecanismo:</strong> {{ a.mecanismo }}</p>
+                  <p><strong>Consecuencia:</strong> {{ a.consecuencia }}</p>
+                  <p><strong>Qué hacer:</strong> {{ a.accion }}</p>
+                </div>
+              }
+              <h3>Recomendaciones dietéticas:</h3>
+              <ul> @for (r of g.recomendacionesDieteticas; track r) { <li>{{ r }}</li> } </ul>
+            </div>
+          }
+        </div>
+      }
+
+      @if (tab() === 'precios') {
+        <div class="card section form-grid ai-panel">
+          <h2 class="section-title">💊 Triangulación de precios (Isolation Forest + Prophet)</h2>
+          <p class="info-msg">Comparamos tu precio reportado con cadenas nacionales e importadoras. Detectamos sobreprecios y desabastecimiento artificial especulativo.</p>
+          <div><label>Medicamento *</label><input class="input" [(ngModel)]="preciosReq.medicamento" placeholder="Ej: Acetaminofén 500mg x 20 tabletas" /></div>
+          <div><label>Presentación</label><input class="input" [(ngModel)]="preciosReq.presentacion" placeholder="Tabletas, cápsulas, ampollas..." /></div>
+          <div><label>Precio que te cobraron (COP)</label><input class="input" type="number" [(ngModel)]="preciosPrecioTxt" placeholder="45000" /></div>
+          <div><label>Ciudad</label><input class="input" [(ngModel)]="preciosReq.ciudad" placeholder="Pasto, Bogotá, Cali..." /></div>
+          <div class="full">
+            <button type="button" class="btn btn-green full" (click)="preciosAnalizar()" [disabled]="preciosLoading()">
+              {{ preciosLoading() ? 'Triangulando precios...' : '🔬 Comparar precios' }}
+            </button>
+          </div>
+
+          @if (preciosRsp(); as p) {
+            <div class="ai-result">
+              <div class="severity-row">
+                <span class="severity-chip" [class]="severidadColor(p.evaluacionSobreprecio)">{{ p.evaluacionSobreprecio.replace('_',' ') }}</span>
+                @if (p.porcentajeDesviacion !== 0) { <span class="chip-outline">Desviación vs promedio: {{ p.porcentajeDesviacion > 0 ? '+' : '' }}{{ p.porcentajeDesviacion.toFixed(1) }}%</span> }
+                @if (p.modoDemo) { <span class="chip-outline demo">MODO DEMO</span> }
+              </div>
+              <div class="price-row">
+                <div><strong>Mínimo esperado</strong><br/>COP {{ p.precioEsperadoMin.toLocaleString() }}</div>
+                <div><strong>Promedio mercado</strong><br/>COP {{ p.precioPromedio.toLocaleString() }}</div>
+                <div><strong>Máximo esperado</strong><br/>COP {{ p.precioEsperadoMax.toLocaleString() }}</div>
+              </div>
+              <h3>Comparativa farmacias (demo):</h3>
+              <table>
+                <thead><tr><th>Farmacia</th><th>Precio (COP)</th><th>Disponibilidad</th><th></th></tr></thead>
+                <tbody>
+                  @for (f of p.comparativa; track f.nombre) {
+                    <tr>
+                      <td>{{ f.nombre }}</td>
+                      <td>{{ f.precio.toLocaleString() }}</td>
+                      <td>{{ f.disponibilidad }}</td>
+                      <td><a [href]="f.url" target="_blank" rel="noopener" class="btn-sm">Ir</a></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              @if (p.alertas?.length) {
+                <h3>Alertas del modelo:</h3>
+                <ul> @for (a of p.alertas; track a) { <li>{{ a }}</li> } </ul>
+              }
+              <div class="reco"><strong>Recomendación:</strong><br/>{{ p.recomendacion }}</div>
+            </div>
+          }
+        </div>
+      }
     </main>
   </div>
 </div>

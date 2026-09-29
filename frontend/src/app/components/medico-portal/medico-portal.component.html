@@ -110,6 +110,159 @@
           </div>
         </div>
       }
+
+      @if (tab() === 'soap') {
+        <section class="card section ai-panel">
+          <header class="section-head">
+            <h2 class="section-title">🧾 Escriba médico · Nota SOAP automatizada</h2>
+            <span class="chip-outline demo">Whisper/DeepSpeech + NER clínico</span>
+          </header>
+
+          <div class="form-grid">
+            <div>
+              <label>Nombre del paciente</label>
+              <input class="input" type="text" [(ngModel)]="soapReq.nombrePaciente" placeholder="Ej: Carlos Méndez" />
+            </div>
+            <div>
+              <label>Motivo inicial</label>
+              <input class="input" type="text" [(ngModel)]="soapReq.motivoInicial" placeholder="Ej: Dolor torácico 2 días" />
+            </div>
+            <div class="full">
+              <label>Transcripción de la consulta (voz o texto libre)</label>
+              <textarea class="input" rows="8" [(ngModel)]="soapReq.transcripcion"
+                placeholder="Paciente refiere dolor opresivo en el hemitórax izquierdo desde hace 48 horas, irradiado a mandíbula, asociado a diaforesis y disnea al esfuerzo. Antecedentes de HTA por 10 años en tratamiento con losartán 50mg/día. Examen físico: TA 158/96, FC 98, saturación 96% en aire ambiente. Ruidos cardiacos rítmicos, no soplos. Pulmones con murmullo conservado. ECG realizado en consulta: sin alteraciones agudas."></textarea>
+            </div>
+          </div>
+
+          <div class="actions-bar">
+            <button type="button" class="btn btn-blue" [disabled]="soapLoading()" (click)="soapGenerar()">
+              {{ soapLoading() ? 'Generando SOAP…' : '🤖 Generar nota SOAP' }}
+            </button>
+            @if (soapRsp()?.modoDemo) { <span class="severity-chip bg-orange">MODO DEMO</span> }
+            @if (error()) { <span class="warn-big">{{ error() }}</span> }
+          </div>
+
+          @if (soapRsp(); as r) {
+            <div class="ai-result">
+              <div class="severity-row">
+                <span class="severity-chip bg-blue">Especialidad: {{ r.especialidadSugerida }}</span>
+                @if (r.diagnosticoPresuntivo) {
+                  <span class="severity-chip bg-orange">Dx presuntivo: {{ r.diagnosticoPresuntivo }}</span>
+                }
+              </div>
+
+              <div class="form-grid" style="margin-top: 1rem;">
+                <div class="card inner" style="border-left: 4px solid var(--green);">
+                  <h4 style="color: var(--green); margin-top: 0;">S · Subjetivo</h4>
+                  <p style="margin: 0; white-space: pre-wrap;">{{ r.subjetivo }}</p>
+                </div>
+                <div class="card inner" style="border-left: 4px solid var(--blue);">
+                  <h4 style="color: var(--blue); margin-top: 0;">O · Objetivo</h4>
+                  <p style="margin: 0; white-space: pre-wrap;">{{ r.objetivo }}</p>
+                </div>
+                <div class="card inner" style="border-left: 4px solid var(--orange);">
+                  <h4 style="color: var(--orange); margin-top: 0;">A · Apreciación</h4>
+                  <p style="margin: 0; white-space: pre-wrap;">{{ r.apreciacion }}</p>
+                </div>
+                <div class="card inner" style="border-left: 4px solid #7c3aed;">
+                  <h4 style="color: #7c3aed; margin-top: 0;">P · Plan</h4>
+                  <p style="margin: 0; white-space: pre-wrap;">{{ r.plan }}</p>
+                </div>
+              </div>
+
+              @if (r.procedimientos?.length) {
+                <h4 style="margin-top: 1rem;">📌 Procedimientos / exámenes sugeridos</h4>
+                <ul style="margin: 0; padding-left: 1.25rem;">
+                  @for (p of r.procedimientos; track p) { <li>{{ p }}</li> }
+                </ul>
+              }
+            </div>
+          }
+        </section>
+      }
+
+      @if (tab() === 'precios') {
+        <section class="card section ai-panel">
+          <header class="section-head">
+            <h2 class="section-title">💊 Triangulación de precios · Isolation Forest + Prophet</h2>
+            <span class="chip-outline demo">Detección de sobreprecios en tiempo real</span>
+          </header>
+
+          <div class="form-grid">
+            <div>
+              <label>Medicamento</label>
+              <input class="input" type="text" [(ngModel)]="preciosReq.medicamento" placeholder="Ej: Atorvastatina" />
+            </div>
+            <div>
+              <label>Presentación</label>
+              <input class="input" type="text" [(ngModel)]="preciosReq.presentacion" placeholder="Ej: 20mg · caja x30" />
+            </div>
+            <div>
+              <label>Precio reportado por el paciente (COP)</label>
+              <input class="input" type="number" [(ngModel)]="preciosPrecioTxt" placeholder="Ej: 45000" />
+            </div>
+            <div>
+              <label>Ciudad</label>
+              <input class="input" type="text" [(ngModel)]="preciosReq.ciudad" placeholder="Bogotá, Medellín…" />
+            </div>
+          </div>
+
+          <div class="actions-bar">
+            <button type="button" class="btn btn-blue" [disabled]="preciosLoading()" (click)="preciosAnalizar()">
+              {{ preciosLoading() ? 'Analizando mercado…' : '🔍 Triangular precio' }}
+            </button>
+            @if (preciosRsp()?.modoDemo) { <span class="severity-chip bg-orange">MODO DEMO</span> }
+            @if (error()) { <span class="warn-big">{{ error() }}</span> }
+          </div>
+
+          @if (preciosRsp(); as r) {
+            <div class="ai-result">
+              <div class="severity-row">
+                <span class="severity-chip" [class]="severidadColor(r.nivelSobreprecio)">
+                  Nivel: {{ r.nivelSobreprecio }}
+                </span>
+                <span class="severity-chip bg-blue">Desviación: {{ r.porcentajeDesviacion }}%</span>
+                @if (r.sospechaDesabastecimiento) {
+                  <span class="severity-chip bg-red">⚠ Riesgo desabastecimiento</span>
+                }
+              </div>
+
+              <div class="card inner" style="margin-top: 1rem;">
+                <p style="margin: 0 0 0.5rem 0;"><strong>Evaluación:</strong> {{ r.evaluacion }}</p>
+                @if (r.recomendacion) {
+                  <p style="margin: 0;"><strong>Recomendación:</strong> {{ r.recomendacion }}</p>
+                }
+              </div>
+
+              <div class="price-row">
+                <div><span>Mínimo mercado</span><strong>${{ r.precioMinimo | number }}</strong></div>
+                <div><span>Promedio</span><strong>${{ r.precioPromedio | number }}</strong></div>
+                <div><span>Máximo</span><strong>${{ r.precioMaximo | number }}</strong></div>
+              </div>
+
+              <h4 style="margin-top: 1rem;">🏥 Comparativa por farmacia</h4>
+              <table>
+                <thead>
+                  <tr><th>Farmacia</th><th>Precio</th><th>Desviación</th><th>Ubicación</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  @for (f of r.comparativa; track f.farmacia) {
+                    <tr>
+                      <td>{{ f.farmacia }}</td>
+                      <td>${{ f.precio | number }}</td>
+                      <td>{{ f.porcentajeDiferencia }}%</td>
+                      <td>{{ f.ciudad }}</td>
+                      <td><span class="severity-chip" [class]="f.sobreprecio ? 'bg-red' : 'bg-green'">
+                        {{ f.sobreprecio ? 'SOBREPRECIO' : 'ACEPTABLE' }}
+                      </span></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+      }
     </main>
   </div>
 </div>

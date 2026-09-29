@@ -5,7 +5,6 @@ import com.usuario.Medico.dto.UsuarioRequest;
 import com.usuario.Medico.model.Administrador;
 import com.usuario.Medico.model.Rol;
 import com.usuario.Medico.model.Usuario;
-import com.usuario.Medico.dto.UsuarioRequest;
 import com.usuario.Medico.repository.AdministradorRepository;
 import com.usuario.Medico.repository.MedicoRepository;
 import com.usuario.Medico.repository.PacienteRepository;
@@ -31,7 +30,23 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (!usuarioRepository.existsByEmail("admin@hospy.com")) {
+        asegurarAdminDemo();
+        migrarPerfilesExistentes();
+        asegurarMedicoDemo();
+    }
+
+    /** Credenciales fijas de demo (se reactivan y restablecen al arrancar). */
+    private void asegurarAdminDemo() {
+        usuarioRepository.findByEmail("admin@hospy.com").ifPresentOrElse(u -> {
+            u.setPassword(passwordEncoder.encode("admin123"));
+            u.setRol(Rol.ADMIN);
+            u.setActivo(true);
+            usuarioRepository.save(u);
+            if (administradorRepository.findByUsuario(u).isEmpty()) {
+                administradorRepository.save(Administrador.builder()
+                        .usuario(u).cargo("Gerencia General").build());
+            }
+        }, () -> {
             Usuario admin = usuarioRepository.save(Usuario.builder()
                     .nombre("Administrador")
                     .email("admin@hospy.com")
@@ -43,37 +58,39 @@ public class DataInitializer implements CommandLineRunner {
                     .usuario(admin)
                     .cargo("Gerencia General")
                     .build());
-        } else {
-            usuarioRepository.findByEmail("admin@hospy.com").ifPresent(u -> {
-                if (u.getRol() == Rol.ADMIN && administradorRepository.findByUsuario(u).isEmpty()) {
-                    administradorRepository.save(Administrador.builder()
-                            .usuario(u).cargo("Gerencia General").build());
-                }
-            });
-        }
-        migrarPerfilesExistentes();
-        crearMedicoDemo();
+        });
     }
 
-    private void crearMedicoDemo() {
-        if (!usuarioRepository.existsByEmail("doctor@hospy.com")) {
-            UsuarioRequest req = new UsuarioRequest();
-            req.setNombre("Dr. María García");
-            req.setEmail("doctor@hospy.com");
-            req.setPassword("Medico123");
-            req.setRol("MEDICO");
-            req.setEspecialidad("Cardiología");
-            req.setNumeroLicencia("MED-2024-001");
-            req.setConsultorio("Consultorio 301");
-            req.setAnosExperiencia(12);
-            req.setBiografia("Especialista en cardiología clínica.");
-            req.setTelefono("3001112233");
+    private void asegurarMedicoDemo() {
+        UsuarioRequest req = new UsuarioRequest();
+        req.setNombre("Dr. María García");
+        req.setEmail("doctor@hospy.com");
+        req.setPassword("Medico123");
+        req.setRol("MEDICO");
+        req.setEspecialidad("Cardiología");
+        req.setNumeroLicencia("MED-2024-001");
+        req.setConsultorio("Consultorio 301");
+        req.setAnosExperiencia(12);
+        req.setBiografia("Especialista en cardiología clínica.");
+        req.setTelefono("3001112233");
+
+        usuarioRepository.findByEmail("doctor@hospy.com").ifPresentOrElse(u -> {
+            u.setPassword(passwordEncoder.encode("Medico123"));
+            u.setRol(Rol.MEDICO);
+            u.setActivo(true);
+            u.setNombre(req.getNombre());
+            u.setTelefono(req.getTelefono());
+            usuarioRepository.save(u);
+            if (medicoRepository.findByUsuario(u).isEmpty()) {
+                perfilService.crearPerfil(u, req);
+            }
+        }, () -> {
             Usuario u = usuarioRepository.save(Usuario.builder()
                     .nombre(req.getNombre()).email(req.getEmail())
                     .password(passwordEncoder.encode(req.getPassword()))
                     .rol(Rol.MEDICO).telefono(req.getTelefono()).activo(true).build());
             perfilService.crearPerfil(u, req);
-        }
+        });
     }
 
     /** Migra usuarios viejos que no tenían tabla de perfil */

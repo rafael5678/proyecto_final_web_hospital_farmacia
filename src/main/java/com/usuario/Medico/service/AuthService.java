@@ -41,7 +41,7 @@ public class AuthService {
 
     /** HU-02: Login con JWT */
     public AuthResponse login(AuthRequest req) {
-        Usuario usuario = usuarioRepository.findByEmail(req.getEmail())
+        Usuario usuario = usuarioRepository.findByEmail(resolverEmailLogin(req.getEmail(), req.getRol()))
                 .orElseThrow(() -> new RuntimeException("Credenciales inválidas"));
         if (!passwordEncoder.matches(req.getPassword(), usuario.getPassword())) {
             throw new RuntimeException("Credenciales inválidas");
@@ -66,5 +66,25 @@ public class AuthService {
                 .email(usuario.getEmail())
                 .rol(usuario.getRol().name())
                 .build();
+    }
+
+    /** Admin demo también entra con usuario "admin"; médico demo con "doctor". */
+    private String resolverEmailLogin(String identificador, String rol) {
+        if (identificador == null) {
+            return "";
+        }
+        String valor = identificador.trim();
+        if (valor.contains("@")) {
+            return valor;
+        }
+        if ("admin".equalsIgnoreCase(valor)
+                && (rol == null || rol.isBlank() || "ADMIN".equalsIgnoreCase(rol))) {
+            return "admin@hospy.com";
+        }
+        if ("doctor".equalsIgnoreCase(valor)
+                && (rol == null || rol.isBlank() || "MEDICO".equalsIgnoreCase(rol))) {
+            return "doctor@hospy.com";
+        }
+        return valor;
     }
 }

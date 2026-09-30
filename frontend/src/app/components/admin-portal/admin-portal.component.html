@@ -114,21 +114,59 @@
 
       @if (tab() === 'citas' && sub() === 'supervision') {
         <h2 class="section-title">Supervisión de citas</h2>
+        @if (mensajeCambio()) { <p class="status-row">{{ mensajeCambio() }}</p> }
+        <div class="stats-grid">
+          <div class="stat"><span>Citas registradas</span><strong>{{ citas().length }}</strong></div>
+          <div class="stat"><span>Con triage guardado</span><strong>{{ citasConTriage() }}</strong></div>
+          <div class="stat"><span>Prioridad alta para revisión</span><strong>{{ citasUrgentes() }}</strong></div>
+          <div class="stat"><span>Evaluaciones de piel registradas</span><strong>{{ citasConEvaluacionPiel() }}</strong></div>
+        </div>
+        <div class="form-grid">
+          <input class="input" aria-label="Buscar citas" placeholder="Buscar paciente, médico o severidad" [(ngModel)]="buscarCita" />
+          <select class="input" aria-label="Filtrar por estado" [(ngModel)]="estadoCita">
+            <option value="">Todos los estados</option>
+            <option value="PENDIENTE">Pendientes</option>
+            <option value="ACEPTADA">Aceptadas</option>
+            <option value="RECHAZADA">Rechazadas</option>
+            <option value="CANCELADA">Canceladas</option>
+            <option value="COMPLETADA">Completadas</option>
+          </select>
+        </div>
         <table>
           <thead>
-            <tr><th>Paciente</th><th>Médico</th><th>Fecha</th><th>Estado</th></tr>
+            <tr><th>Paciente</th><th>Médico asignado</th><th>Prioridad orientativa</th><th>Especialidad sugerida</th><th>Fecha</th><th>Estado</th><th></th></tr>
           </thead>
           <tbody>
-            @for (c of citas(); track c.id) {
+            @for (c of citasFiltradas(); track c.id) {
               <tr>
                 <td>{{ c.pacienteNombre }}</td>
-                <td>{{ c.medicoNombre }}</td>
+                <td>{{ c.medicoNombre }}<small>{{ c.medicoEspecialidad }}</small></td>
+                <td>@if (c.triageSeveridad) { {{ c.triageSeveridad }} · ESI {{ c.triageNivelEsi ?? '—' }} · {{ c.triagePrioridad ?? '—' }}/10 } @else { Sin triage }</td>
+                <td>{{ c.triageEspecialidadSugerida || '—' }}</td>
                 <td>{{ c.fechaHora | date:'medium' }}</td>
                 <td><span [class]="badgeClass(c.estado)">{{ c.estado }}</span></td>
+                <td>@if (c.estado === 'PENDIENTE' || c.estado === 'ACEPTADA') { <button type="button" class="btn-sm info" (click)="abrirReprogramacion(c)">Reprogramar</button> }</td>
               </tr>
             }
+            @empty { <tr><td colspan="7">No hay citas que coincidan con esos filtros.</td></tr> }
           </tbody>
         </table>
+        @if (citaAReprogramar(); as cita) {
+          <section class="card section">
+            <h3>Reprogramar cita de {{ cita.pacienteNombre }}</h3>
+            <p>Actual: {{ cita.fechaHora | date:'medium' }} · {{ cita.medicoNombre }}</p>
+            <p class="hint">El cambio requiere revisión administrativa. Se intentará avisar por correo al paciente y al médico; las citas no se desplazan automáticamente por el puntaje de IA.</p>
+            <label>Nueva fecha y hora</label>
+            <input class="input" type="datetime-local" [(ngModel)]="nuevaFechaHora" />
+            <label>Motivo del cambio</label>
+            <textarea class="input" rows="2" maxlength="500" [(ngModel)]="motivoReprogramacion" placeholder="Explica el motivo que verán el paciente y el médico"></textarea>
+            @if (error()) { <p class="error-msg">{{ error() }}</p> }
+            <div class="actions-bar">
+              <button type="button" class="btn btn-purple" (click)="reprogramarCita()" [disabled]="guardandoCambio()">{{ guardandoCambio() ? 'Guardando...' : 'Confirmar cambio' }}</button>
+              <button type="button" class="btn-sm" (click)="citaAReprogramar.set(null)">Cancelar</button>
+            </div>
+          </section>
+        }
       }
 
       @if (tab() === 'reportes' && reporte(); as r) {
@@ -163,133 +201,129 @@
             <span class="chip-outline demo">Monitoreo · Métricas · Estado</span>
           </header>
 
-          @if (aiStatus(); as st) {
+          @if (aiMetricas(); as m) {
             <div class="ai-status-bar">
-              <span class="severity-chip" [class]="st.apiKeyActiva ? 'bg-green' : 'bg-red'">
-                {{ st.apiKeyActiva ? '✓ API KEY ACTIVA' : '✗ SIN API KEY (MODO DEMO)' }}
+              <span class="severity-chip" [class]="m.apiKeyActiva ? 'bg-green' : 'bg-orange'">
+                {{ m.apiKeyActiva ? 'API KEY CONFIGURADA · IA OPERATIVA' : 'MODO DEMO · SIN API KEY' }}
               </span>
-              <span class="chip-outline">{{ st.version }}</span>
+              <span class="chip-outline">{{ m.versionIa }}</span>
             </div>
+
+            <h3 style="margin-top: 1.5rem;">📊 Análisis totales procesados por la IA</h3>
+            <div class="stats-grid ai-stats">
+              <div class="stat ai-stat">
+                <div class="ai-stat-icon triage-icon">🎯</div>
+                <div><span>Triage en citas</span><strong>{{ m.citasConTriage }}</strong></div>
+                <small class="ai-stat-desc">Citas reales con severidad guardada</small>
+              </div>
+              <div class="stat ai-stat">
+                <div class="ai-stat-icon derma-icon">🔬</div>
+                <div><span>Dermatología</span><strong>{{ m.citasConEvaluacionPiel }}</strong></div>
+                <small class="ai-stat-desc">Evaluaciones de piel y lesiones</small>
+              </div>
+              <div class="stat ai-stat">
+                <div class="ai-stat-icon triage-icon">⚠️</div>
+                <div><span>Prioridad alta</span><strong>{{ m.citasPrioridadAlta }}</strong></div>
+                <small class="ai-stat-desc">Severidad Rojo/Naranja o prioridad ≥ 8/10</small>
+              </div>
+              <div class="stat ai-stat">
+                <div class="ai-stat-icon" style="font-size:1.5rem">🔄</div>
+                <div><span>Reprogramadas por IA</span><strong>{{ m.citasReprogramadasPorIA }}</strong></div>
+                <small class="ai-stat-desc">Citas movidas por priorización automática</small>
+              </div>
+            </div>
+
+            <h3 style="margin-top: 1.5rem;">📈 Distribución de severidad triage</h3>
+            <div class="severity-distribution">
+              @for (entry of severidadEntries(m.distribucionSeveridad); track entry.key) {
+                <div class="severity-bar-item">
+                  <span class="severity-label">{{ entry.key }}</span>
+                  <div class="severity-bar-track">
+                    <div class="severity-bar-fill" [class]="severidadBarColor(entry.key)"
+                      [style.width.%]="m.citasConTriage > 0 ? (entry.value / m.citasConTriage * 100) : 0"></div>
+                  </div>
+                  <span class="severity-count">{{ entry.value }}</span>
+                </div>
+              }
+            </div>
+
+            <div class="ai-supervision-grid">
+              <div class="card inner ai-superv-card triage">
+                <h4>🎯 Triage (agendar cita)</h4>
+                <ul>
+                  <li>Usa los mismos análisis que el paciente al agendar</li>
+                  <li>Especialidad y prioridad 1-10 persistidas en la cita</li>
+                  <li>Reprograma si entra un caso más grave</li>
+                  <li>Aviso por correo a paciente y médico</li>
+                </ul>
+                <p class="status-row">Estado: <strong>{{ m.estadoTriage }}</strong></p>
+              </div>
+
+              <div class="card inner ai-superv-card derma">
+                <h4>🔬 Piel / lesiones (en agendar)</h4>
+                <ul>
+                  <li>Texto clínico, no CNN de imagen</li>
+                  <li>Score de riesgo 0.0 - 1.0</li>
+                  <li>Llega al médico en la ficha de la cita</li>
+                  <li>Cuenta: {{ m.citasConEvaluacionPiel }} citas con piel</li>
+                </ul>
+                <p class="status-row">Estado: <strong>{{ m.estadoDermatologia }}</strong></p>
+              </div>
+
+              <div class="card inner ai-superv-card soap">
+                <h4>📝 Escriba médico SOAP</h4>
+                <ul>
+                  <li>Whisper si hay API key; si no, voz del navegador</li>
+                  <li>Borrador S / O / A / P para firmar</li>
+                  <li>Usa triage + historial del paciente</li>
+                  <li>Estado Whisper: {{ m.estadoWhisper }}</li>
+                </ul>
+                <p class="status-row">Estado SOAP: <strong>{{ m.estadoSoap }}</strong></p>
+              </div>
+
+              <div class="card inner ai-superv-card inter">
+                <h4>🧬 Grafos fármaco-alimento</h4>
+                <ul>
+                  <li>Análisis interacciones medicamentosas</li>
+                  <li>Integración alertas de severidad</li>
+                  <li>5 niveles riesgo global</li>
+                  <li>Alertas + recomendaciones dieta</li>
+                </ul>
+                <p class="status-row">Estado: <strong>{{ m.estadoInteracciones }}</strong></p>
+              </div>
+
+              <div class="card inner ai-superv-card price">
+                <h4>💰 Triangulación precios</h4>
+                <ul>
+                  <li>Análisis de sobreprecios</li>
+                  <li>Comparativa farmacias locales</li>
+                  <li>Detección desabastecimiento artificial</li>
+                  <li>Estimación rango de precios</li>
+                </ul>
+                <p class="status-row">Estado: <strong>{{ m.estadoPrecios }}</strong></p>
+              </div>
+
+              <div class="card inner ai-superv-card sec">
+                <h4>🔐 Seguridad sesiones</h4>
+                <ul>
+                  <li>⏱ Médicos: <strong>{{ m.timeoutMedicoSeg / 60 }} min</strong> inactividad</li>
+                  <li>⏱ Administradores: <strong>{{ m.timeoutAdminSeg }} s</strong> inactividad</li>
+                  <li>✅ JWT interceptores</li>
+                  <li>✅ Guards de rol y autenticación</li>
+                </ul>
+                <p class="status-row">Estado: <strong>Activo</strong></p>
+              </div>
+            </div>
+          } @else {
+            <p class="empty">Cargando métricas de IA...</p>
           }
-
-          <h3 style="margin-top: 1.5rem;">📊 Análisis totales procesados por la IA</h3>
-          <div class="stats-grid ai-stats">
-            <div class="stat ai-stat">
-              <div class="ai-stat-icon triage-icon">🎯</div>
-              <div>
-                <span>Triage NLP (BERT)</span>
-                <strong>{{ totalAnalisis().triage }}</strong>
-              </div>
-              <small class="ai-stat-desc">Síntomas · ESI/MTS · Prioridad</small>
-            </div>
-            <div class="stat ai-stat">
-              <div class="ai-stat-icon derma-icon">🔬</div>
-              <div>
-                <span>Dermatología CNN</span>
-                <strong>{{ totalAnalisis().dermatologia }}</strong>
-              </div>
-              <small class="ai-stat-desc">ResNet/EfficientNet · Lesiones</small>
-            </div>
-            <div class="stat ai-stat">
-              <div class="ai-stat-icon soap-icon">📝</div>
-              <div>
-                <span>Escriba SOAP</span>
-                <strong>{{ totalAnalisis().soap }}</strong>
-              </div>
-              <small class="ai-stat-desc">Whisper + NER clínico</small>
-            </div>
-            <div class="stat ai-stat">
-              <div class="ai-stat-icon inter-icon">🧬</div>
-              <div>
-                <span>Interacciones GNN</span>
-                <strong>{{ totalAnalisis().interacciones }}</strong>
-              </div>
-              <small class="ai-stat-desc">DrugBank · Fármaco-Alimento</small>
-            </div>
-            <div class="stat ai-stat">
-              <div class="ai-stat-icon price-icon">💰</div>
-              <div>
-                <span>Triangulación precios</span>
-                <strong>{{ totalAnalisis().precios }}</strong>
-              </div>
-              <small class="ai-stat-desc">Isolation Forest + Prophet</small>
-            </div>
-          </div>
-
-          <div class="ai-supervision-grid">
-            <div class="card inner ai-superv-card triage">
-              <h4>🎯 Triage activo NLP</h4>
-              <ul>
-                <li>✅ Inferencia severidad ESI/MTS 5 niveles</li>
-                <li>✅ Especialidad automática</li>
-                <li>✅ Prioridad 1-10 · Recomendaciones</li>
-                <li>✅ Procesamiento síntomas dictados</li>
-              </ul>
-              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
-            </div>
-
-            <div class="card inner ai-superv-card derma">
-              <h4>🔬 Predermatología (Visión)</h4>
-              <ul>
-                <li>✅ CNN ResNet/EfficientNet</li>
-                <li>✅ Score riesgo 0.0 - 1.0</li>
-                <li>✅ Diagnósticos diferenciales</li>
-                <li>✅ Reporte pre-consulta</li>
-              </ul>
-              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
-            </div>
-
-            <div class="card inner ai-superv-card soap">
-              <h4>📝 Escriba médico SOAP</h4>
-              <ul>
-                <li>✅ Speech-to-text Whisper/DeepSpeech</li>
-                <li>✅ NER clínico extracción entidades</li>
-                <li>✅ Formato S / O / A / P</li>
-                <li>✅ Dx presuntivo + procedimientos</li>
-              </ul>
-              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
-            </div>
-
-            <div class="card inner ai-superv-card inter">
-              <h4>🧬 Grafos fármaco-alimento</h4>
-              <ul>
-                <li>✅ Graph Neural Network (GNN)</li>
-                <li>✅ Integración DrugBank</li>
-                <li>✅ 5 niveles riesgo global</li>
-                <li>✅ Alertas + recomendaciones dieta</li>
-              </ul>
-              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
-            </div>
-
-            <div class="card inner ai-superv-card price">
-              <h4>💰 Triangulación precios</h4>
-              <ul>
-                <li>✅ Isolation Forest anomalías</li>
-                <li>✅ Prophet series tiempo</li>
-                <li>✅ Comparativa farmacias locales</li>
-                <li>✅ Detección desabastecimiento artificial</li>
-              </ul>
-              <p class="status-row ok">Estado: <strong>Operativo</strong></p>
-            </div>
-
-            <div class="card inner ai-superv-card sec">
-              <h4>🔐 Seguridad sesiones</h4>
-              <ul>
-                <li>⏱ Médicos: <strong>5 min</strong> inactividad</li>
-                <li>⏱ Administradores: <strong>10 s</strong> inactividad</li>
-                <li>✅ JWT interceptores</li>
-                <li>✅ Guards de rol y autenticación</li>
-              </ul>
-              <p class="status-row ok">Estado: <strong>Activo</strong></p>
-            </div>
-          </div>
         </section>
       }
 
       @if (tab() === 'preciosauditoria') {
         <section class="card section ai-panel">
           <header class="section-head">
-            <h2 class="section-title">💰 Auditoría de precios · Isolation Forest + Prophet</h2>
+            <h2 class="section-title">💰 Auditoría de precios (misma herramienta del paciente)</h2>
             <span class="chip-outline demo">Detección de sobreprecios y desabastecimiento</span>
           </header>
 

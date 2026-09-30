@@ -20,6 +20,18 @@ public final class CitaMapper {
                 .estado(c.getEstado().name())
                 .motivo(c.getMotivo())
                 .notas(c.getNotas())
+                .triageSeveridad(c.getTriageSeveridad())
+                .triageNivelEsi(c.getTriageNivelEsi())
+                .triagePrioridad(c.getTriagePrioridad())
+                .triageEspecialidadSugerida(c.getTriageEspecialidadSugerida())
+                .triageResumen(c.getTriageResumen())
+                .triageSintomas(c.getTriageSintomas())
+                .triageDuracion(c.getTriageDuracion())
+                .triageAntecedentes(c.getTriageAntecedentes())
+                .dermatologiaReportaIa(c.getDermatologiaReportaIa())
+                .dermatologiaScoreRiesgo(c.getDermatologiaScoreRiesgo())
+                .dermatologiaTopDiagnostico(c.getDermatologiaTopDiagnostico())
+                .avisoAgenda(null)
                 .build();
     }
 }

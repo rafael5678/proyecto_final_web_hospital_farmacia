@@ -37,4 +37,25 @@ public class Cita {
     private String motivo;
 
     private String notas;
+
+    /* ====== Campos IA adjuntos al momento de AGENDAR (guardados automáticamente) ====== */
+    /* Triage NLP BERT/RoBERTa (ESI/MTS) */
+    private String triageSeveridad;        /* "ROJO / NARANJA / AMARILLO / VERDE / AZUL" */
+    private Integer triageNivelEsi;        /* 1-5, Emergency Severity Index */
+    private Integer triagePrioridad;       /* 1-10 */
+    private String triageEspecialidadSugerida;  /* "Dermatología", "Medicina General"... */
+    @Column(columnDefinition = "TEXT")
+    private String triageResumen;          /* Resumen clínico IA que lee el médico */
+    @Column(columnDefinition = "TEXT")
+    private String triageSintomas;
+    @Column(length = 255)
+    private String triageDuracion;
+    @Column(columnDefinition = "TEXT")
+    private String triageAntecedentes;
+
+    /* Predermatología CNN ResNet/EfficientNet */
+    @Column(columnDefinition = "TEXT")
+    private String dermatologiaReportaIa;  /* Reporte completo + diferenciales + recomendaciones */
+    private Double dermatologiaScoreRiesgo; /* 0.0 a 1.0 */
+    private String dermatologiaTopDiagnostico; /* Diagnóstico principal sugerido */
 }

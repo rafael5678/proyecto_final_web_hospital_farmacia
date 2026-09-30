@@ -10,6 +10,7 @@ import { PortalSidebarComponent, SidebarItem } from '../portal-sidebar/portal-si
 import { SessionTimeoutComponent } from '../session-timeout/session-timeout.component';
 import { AiService } from '../../services/ai.service';
 import { AiPreciosRequest, AiPreciosResponse } from '../../models/ai.model';
+import { AiMetricas } from '../../models/ai-metricas.model';
 
 type AdminTab = 'inicio' | 'usuarios' | 'medicos' | 'citas' | 'reportes' | 'iasuperv' | 'preciosauditoria';
 type AdminSub = '' | 'lista' | 'crear' | 'supervision' | 'resumen' | 'mensual';
@@ -81,6 +82,13 @@ export class AdminPortalComponent implements OnInit {
   usuarios = signal<Usuario[]>([]);
   medicos = signal<Usuario[]>([]);
   citas = signal<Cita[]>([]);
+  buscarCita = '';
+  estadoCita = '';
+  citaAReprogramar = signal<Cita | null>(null);
+  nuevaFechaHora = '';
+  motivoReprogramacion = '';
+  mensajeCambio = signal('');
+  guardandoCambio = signal(false);
   reporte = signal<Reporte | null>(null);
 
   form: UsuarioRequest = {
@@ -90,7 +98,7 @@ export class AdminPortalComponent implements OnInit {
   error = signal('');
 
   aiStatus = signal<{ apiKeyActiva: boolean; version: string } | null>(null);
-  totalAnalisis = signal({ triage: 37, dermatologia: 12, soap: 84, interacciones: 56, precios: 41 });
+  aiMetricas = signal<AiMetricas | null>(null);
 
   preciosReq: AiPreciosRequest = {
     medicamento: '',
@@ -108,10 +116,15 @@ export class AdminPortalComponent implements OnInit {
     this.cargarCitas();
     this.cargarReportes();
     this.cargarAiStatus();
+    this.cargarAiMetricas();
   }
 
   cargarAiStatus() {
     this.ai.status().subscribe({ next: s => this.aiStatus.set(s) });
+  }
+
+  cargarAiMetricas() {
+    this.adminService.aiMetricas().subscribe({ next: m => this.aiMetricas.set(m) });
   }
 
   onNavigate(item: SidebarItem) {
@@ -119,6 +132,7 @@ export class AdminPortalComponent implements OnInit {
     this.tab.set(item.tab as AdminTab);
     this.sub.set((item.sub ?? '') as AdminSub);
     if (item.tab === 'reportes') this.cargarReportes();
+    if (item.tab === 'iasuperv') this.cargarAiMetricas();
     const group = this.menuItems.find(m => m.children?.some(c => c.id === item.id));
     if (group && !this.expandedMenus().includes(group.id)) {
       this.expandedMenus.set([...this.expandedMenus(), group.id]);
@@ -162,6 +176,56 @@ export class AdminPortalComponent implements OnInit {
 
   cargarCitas() {
     this.adminService.supervisarCitas().subscribe({ next: c => this.citas.set(c) });
+  }
+
+  citasFiltradas(): Cita[] {
+    const consulta = this.buscarCita.trim().toLocaleLowerCase();
+    return this.citas().filter(c => {
+      const coincideEstado = !this.estadoCita || c.estado === this.estadoCita;
+      const texto = `${c.pacienteNombre} ${c.medicoNombre} ${c.medicoEspecialidad ?? ''} ${c.triageSeveridad ?? ''}`.toLocaleLowerCase();
+      return coincideEstado && (!consulta || texto.includes(consulta));
+    });
+  }
+
+  citasConTriage(): number {
+    return this.citas().filter(c => c.triageSeveridad).length;
+  }
+
+  citasConEvaluacionPiel(): number {
+    return this.citas().filter(c => c.dermatologiaScoreRiesgo != null).length;
+  }
+
+  citasUrgentes(): number {
+    return this.citas().filter(c => (c.triagePrioridad ?? 0) >= 8 || ['ROJO', 'NARANJA'].includes((c.triageSeveridad ?? '').toUpperCase())).length;
+  }
+
+  abrirReprogramacion(cita: Cita) {
+    this.citaAReprogramar.set(cita);
+    this.nuevaFechaHora = '';
+    this.motivoReprogramacion = '';
+    this.mensajeCambio.set('');
+  }
+
+  reprogramarCita() {
+    const cita = this.citaAReprogramar();
+    if (!cita || !this.nuevaFechaHora || !this.motivoReprogramacion.trim()) {
+      this.error.set('Indica la nueva fecha y el motivo del cambio.');
+      return;
+    }
+    this.error.set('');
+    this.guardandoCambio.set(true);
+    this.adminService.reprogramarCita(cita.id, `${this.nuevaFechaHora}:00`, this.motivoReprogramacion.trim()).subscribe({
+      next: result => {
+        this.guardandoCambio.set(false);
+        this.mensajeCambio.set(result.mensaje);
+        this.citaAReprogramar.set(null);
+        this.cargarCitas();
+      },
+      error: e => {
+        this.guardandoCambio.set(false);
+        this.error.set(e.error?.error ?? 'No se pudo reprogramar la cita.');
+      }
+    });
   }
 
   cargarReportes() {
@@ -232,9 +296,22 @@ export class AdminPortalComponent implements OnInit {
     this.preciosLoading.set(true);
     this.ai.precios(this.preciosReq).subscribe({
       next: r => this.preciosRsp.set(r),
-      error: () => this.error.set('Error al analizar precios. Reintente.'),
       complete: () => this.preciosLoading.set(false)
     });
+  }
+
+  severidadEntries(dist: { [key: string]: number }): { key: string; value: number }[] {
+    if (!dist) return [];
+    return Object.entries(dist).map(([key, value]) => ({ key, value }));
+  }
+
+  severidadBarColor(sev: string): string {
+    const s = sev.toLowerCase();
+    if (s.includes('rojo')) return 'bar-red';
+    if (s.includes('naranja')) return 'bar-orange';
+    if (s.includes('amarillo')) return 'bar-yellow';
+    if (s.includes('verde')) return 'bar-green';
+    return 'bar-blue';
   }
 
 }

@@ -120,3 +120,9 @@ export interface AiStatusResponse {
   apiKeyActiva: boolean;
   version: string;
 }
+
+export interface AiTranscripcionResponse {
+  texto: string;
+  modoDemo: boolean;
+  mensaje: string;
+}

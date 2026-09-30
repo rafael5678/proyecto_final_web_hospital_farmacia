@@ -62,15 +62,6 @@ export class PacientePortalComponent implements OnInit {
       label: 'IA Hospitalaria',
       icon: '🤖',
       children: [
-        { id: 'ai-triage', label: 'Triage de síntomas', tab: 'triage', sub: 'triage' },
-        { id: 'ai-derm', label: 'Piel / Lesiones', tab: 'dermatologia', sub: 'derm' }
-      ]
-    },
-    {
-      id: 'medicamentos',
-      label: 'Medicamentos',
-      icon: '💊',
-      children: [
         { id: 'm-inter', label: 'Interacciones fármaco-alimento', tab: 'interacciones', sub: 'inter' },
         { id: 'm-precios', label: 'Precios y farmacias', tab: 'precios', sub: 'precios' }
       ]
@@ -96,6 +87,11 @@ export class PacientePortalComponent implements OnInit {
   medicoId: number | null = null;
   fechaHora = '';
   motivo = '';
+  sintomas = '';
+  duracionSintomas = '';
+  antecedentesSintomas = '';
+  tieneLesionPiel = false;
+  consentimientoTriage = false;
   filtroEspecialidad = '';
   error = signal('');
   ok = signal('');
@@ -137,7 +133,7 @@ export class PacientePortalComponent implements OnInit {
     this.sub.set((item.sub ?? '') as PacienteSub);
     this.error.set('');
     this.ok.set('');
-    if (item.tab === 'perfil') this.cargarPerfil();
+    if (item.tab === 'perfil' || item.tab === 'agendar') this.cargarPerfilYAntecedentes();
     if (item.tab === 'proximas') this.svc.proximas().subscribe({ next: c => this.proximas.set(c) });
     const group = this.menuItems.find(m => m.children?.some(c => c.id === item.id));
     if (group && !this.expandedMenus().includes(group.id)) {
@@ -157,15 +153,13 @@ export class PacientePortalComponent implements OnInit {
   pageTitle(): string {
     const map: Record<string, string> = {
       inicio: 'Panel del paciente',
-      agendar: 'Agendar cita médica',
+      agendar: 'Agendar cita (triage + piel + médico)',
       historial: 'Historial de citas',
       proximas: 'Próximas citas',
       'medicos-directorio': 'Directorio de médicos',
       'perfil-editar': 'Mi perfil',
-      'triage-triage': '🤖 Triage de síntomas (NLP clínico)',
-      'dermatologia-derm': '🤖 Pre-diagnóstico cutáneo (CNN)',
-      'interacciones-inter': '💊 Interacciones fármaco-alimento (GNN)',
-      'precios-precios': '💊 Precios y abastecimiento de medicamentos'
+      'interacciones-inter': 'Interacciones fármaco-alimento',
+      'precios-precios': 'Precios y farmacias'
     };
     const key = this.sub() ? `${this.tab()}-${this.sub()}` : this.tab();
     return map[key] ?? map[this.tab()] ?? 'Portal del paciente';
@@ -177,7 +171,18 @@ export class PacientePortalComponent implements OnInit {
   }
 
   cargarPerfil() {
-    this.svc.perfil().subscribe({ next: p => this.perfil.set({ ...p }) });
+    this.cargarPerfilYAntecedentes();
+  }
+
+  cargarPerfilYAntecedentes() {
+    this.svc.perfil().subscribe({
+      next: p => {
+        this.perfil.set({ ...p });
+        if (!this.antecedentesSintomas) {
+          this.antecedentesSintomas = [p.alergias, p.observaciones].filter(Boolean).join(' · ');
+        }
+      }
+    });
   }
 
   cargarMedicos() {
@@ -185,9 +190,11 @@ export class PacientePortalComponent implements OnInit {
   }
 
   medicosFiltrados(): Usuario[] {
-    const f = this.filtroEspecialidad.toLowerCase();
+    const sugerida = this.triageRsp()?.especialidadRecomendada?.toLowerCase() || '';
+    const f = (this.filtroEspecialidad || sugerida).toLowerCase();
     if (!f) return this.medicos();
-    return this.medicos().filter(m => m.especialidad?.toLowerCase().includes(f));
+    const match = this.medicos().filter(m => m.especialidad?.toLowerCase().includes(f));
+    return match.length ? match : this.medicos();
   }
 
   verMedico(m: Usuario) {
@@ -207,22 +214,46 @@ export class PacientePortalComponent implements OnInit {
   }
 
   agendar() {
-    if (!this.medicoId || !this.fechaHora) {
-      this.error.set('Selecciona médico y fecha/hora');
+    if (!this.medicoId || !this.fechaHora || !this.triageRsp() || (this.tieneLesionPiel && !this.dermRsp())) {
+      this.error.set('Selecciona médico, fecha y completa los análisis requeridos antes de agendar.');
       return;
     }
     this.loading.set(true);
     this.error.set('');
+    const triage = this.triageRsp()!;
+    const dermatologia = this.tieneLesionPiel ? this.dermRsp() : null;
     this.svc.agendarCita({
       medicoId: this.medicoId,
-      fechaHora: new Date(this.fechaHora).toISOString().slice(0, 19),
-      motivo: this.motivo
+      fechaHora: `${this.fechaHora}:00`,
+      motivo: this.motivo || this.sintomas,
+      triageSeveridad: triage.severidad,
+      triageNivelEsi: triage.nivelEsi,
+      triagePrioridad: triage.prioridad,
+      triageEspecialidadSugerida: triage.especialidadRecomendada,
+      triageResumen: triage.resumen,
+      triageSintomas: this.sintomas,
+      triageDuracion: this.duracionSintomas,
+      triageAntecedentes: this.antecedentesSintomas,
+      dermatologiaReportaIa: dermatologia
+        ? `${dermatologia.advertencia} ${dermatologia.recomendaciones} Diferenciales: ${dermatologia.diagnosticosDiferenciales.join(', ')}`
+        : undefined,
+      dermatologiaScoreRiesgo: dermatologia?.scoreRiesgo,
+      dermatologiaTopDiagnostico: dermatologia?.diagnosticosDiferenciales[0]
     }).subscribe({
-      next: () => {
+      next: (cita) => {
         this.loading.set(false);
-        this.ok.set('Cita agendada correctamente');
+        this.ok.set(cita.avisoAgenda
+          ? `Cita agendada. ${cita.avisoAgenda}`
+          : 'Cita agendada. El médico recibe el resumen de IA y tu historial por correo (si SMTP está activo).');
         this.fechaHora = '';
         this.motivo = '';
+        this.sintomas = '';
+        this.duracionSintomas = '';
+        this.antecedentesSintomas = '';
+        this.consentimientoTriage = false;
+        this.triageRsp.set(null);
+        this.dermRsp.set(null);
+        this.tieneLesionPiel = false;
         this.cargarInicio();
         this.cargarHistorial();
         this.tab.set('historial');
@@ -270,16 +301,41 @@ export class PacientePortalComponent implements OnInit {
 
   /* ============ Inteligencia Artificial ============ */
   triageAnalizar() {
-    if (!this.triageReq.sintomas.trim()) {
-      this.error.set('Describe tus síntomas para analizar el triaje.');
+    if (!this.consentimientoTriage) {
+      this.error.set('Autoriza el envío de tus datos de salud al servicio de IA para continuar.');
+      return;
+    }
+    /* En la tab de agendar se usan campos sueltos; en standalone se usa triageReq */
+    const sintomasVal = this.tab() === 'agendar' ? this.sintomas.trim() : (this.triageReq.sintomas || this.sintomas).trim();
+    if (!sintomasVal) {
+      this.error.set('Describe tus síntomas para analizar el triage.');
       return;
     }
     this.triageLoading.set(true);
     this.error.set('');
     this.triageRsp.set(null);
+
+    /* Sincronizar en ambas direcciones */
+    if (this.tab() === 'agendar') {
+      this.triageReq = {
+        sintomas: this.sintomas,
+        duracion: this.duracionSintomas,
+        antecedentes: this.antecedentesSintomas,
+        edadPaciente: this.triageReq.edadPaciente
+      };
+    } else {
+      this.sintomas = this.triageReq.sintomas || '';
+      this.duracionSintomas = this.triageReq.duracion || '';
+      this.antecedentesSintomas = this.triageReq.antecedentes || '';
+    }
+
     this.ai.triage({ ...this.triageReq }).subscribe({
-      next: (r) => { this.triageRsp.set(r); this.triageLoading.set(false); },
-      error: (e) => { this.triageLoading.set(false); this.error.set(e.error?.error ?? 'Error en análisis IA.'); }
+      next: (r) => {
+        this.triageRsp.set(r);
+        this.triageLoading.set(false);
+        this.filtroEspecialidad = r.especialidadRecomendada || '';
+        if (this.tieneLesionPiel && this.dermReq.descripcion.trim()) this.dermAnalizar();
+      }
     });
   }
 
@@ -292,9 +348,13 @@ export class PacientePortalComponent implements OnInit {
     this.error.set('');
     this.dermRsp.set(null);
     this.ai.dermatologia({ ...this.dermReq }).subscribe({
-      next: (r) => { this.dermRsp.set(r); this.dermLoading.set(false); },
-      error: (e) => { this.dermLoading.set(false); this.error.set(e.error?.error ?? 'Error en análisis dermatológico.'); }
+      next: (r) => { this.dermRsp.set(r); this.dermLoading.set(false); }
     });
+  }
+
+  triageCambiar() {
+    this.triageRsp.set(null);
+    this.dermRsp.set(null);
   }
 
   interAnalizar() {
@@ -312,8 +372,7 @@ export class PacientePortalComponent implements OnInit {
     this.error.set('');
     this.interRsp.set(null);
     this.ai.interacciones(req).subscribe({
-      next: (r) => { this.interRsp.set(r); this.interLoading.set(false); },
-      error: (e) => { this.interLoading.set(false); this.error.set(e.error?.error ?? 'Error en análisis de interacciones.'); }
+      next: (r) => { this.interRsp.set(r); this.interLoading.set(false); }
     });
   }
 
@@ -331,8 +390,7 @@ export class PacientePortalComponent implements OnInit {
     this.error.set('');
     this.preciosRsp.set(null);
     this.ai.precios(req).subscribe({
-      next: (r) => { this.preciosRsp.set(r); this.preciosLoading.set(false); },
-      error: (e) => { this.preciosLoading.set(false); this.error.set(e.error?.error ?? 'Error en comparativa de precios.'); }
+      next: (r) => { this.preciosRsp.set(r); this.preciosLoading.set(false); }
     });
   }
 

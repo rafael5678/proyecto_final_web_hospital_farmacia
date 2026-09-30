@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
-import { Cita } from '../models/cita.model';
+import { Cita, ReprogramarCitaResponse } from '../models/cita.model';
 import { Reporte } from '../models/reporte.model';
 import { Usuario, UsuarioRequest } from '../models/usuario.model';
+import { AiMetricas } from '../models/ai-metricas.model';
 
 @Injectable({ providedIn: 'root' })
 export class AdminService {
@@ -43,7 +44,15 @@ export class AdminService {
     return this.http.get<Cita[]>(`${this.api}/citas`);
   }
 
+  reprogramarCita(id: number, fechaHora: string, motivo: string) {
+    return this.http.patch<ReprogramarCitaResponse>(`${this.api}/citas/${id}/reprogramar`, { fechaHora, motivo });
+  }
+
   reportes(anio = new Date().getFullYear()) {
     return this.http.get<Reporte>(`${this.api}/reportes`, { params: { anio } });
+  }
+
+  aiMetricas() {
+    return this.http.get<AiMetricas>(`${this.api}/ai-metricas`);
   }
 }

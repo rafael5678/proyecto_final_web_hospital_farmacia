@@ -63,7 +63,30 @@ CREATE TABLE IF NOT EXISTS citas (
     fecha_hora  TIMESTAMP NOT NULL,
     estado      VARCHAR(255) NOT NULL,
     motivo      VARCHAR(255),
-    notas       VARCHAR(255)
+    notas       VARCHAR(255),
+    triage_severidad VARCHAR(32),
+    triage_nivel_esi INTEGER,
+    triage_prioridad INTEGER,
+    triage_especialidad_sugerida VARCHAR(255),
+    triage_resumen TEXT,
+    triage_sintomas TEXT,
+    triage_duracion VARCHAR(255),
+    triage_antecedentes TEXT,
+    dermatologia_reporta_ia TEXT,
+    dermatologia_score_riesgo DOUBLE PRECISION,
+    dermatologia_top_diagnostico VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS cambios_cita (
+    id BIGSERIAL PRIMARY KEY,
+    cita_id BIGINT NOT NULL REFERENCES citas(id) ON DELETE CASCADE,
+    fecha_anterior TIMESTAMP NOT NULL,
+    fecha_nueva TIMESTAMP NOT NULL,
+    motivo VARCHAR(500) NOT NULL,
+    realizado_por VARCHAR(255) NOT NULL,
+    creado_en TIMESTAMP NOT NULL,
+    correo_paciente_enviado BOOLEAN NOT NULL DEFAULT FALSE,
+    correo_medico_enviado BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 SELECT table_name FROM information_schema.tables

@@ -1,8 +1,10 @@
 package com.usuario.Medico.service;
 
+import com.usuario.Medico.dto.AiMetricasResponse;
 import com.usuario.Medico.dto.ReporteResponse;
 import com.usuario.Medico.model.EstadoCita;
 import com.usuario.Medico.repository.CitaRepository;
+import com.usuario.Medico.repository.CambioCitaRepository;
 import com.usuario.Medico.repository.MedicoRepository;
 import com.usuario.Medico.repository.PacienteRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +28,7 @@ public class ReporteService {
     private final CitaRepository citaRepository;
     private final PacienteRepository pacienteRepository;
     private final MedicoRepository medicoRepository;
+    private final CambioCitaRepository cambioCitaRepository;
 
     public ReporteResponse generarReporte(int anio) {
         List<Map<String, Object>> desglose = new ArrayList<>();
@@ -37,6 +41,46 @@ public class ReporteService {
                 .totalPacientes(pacienteRepository.count())
                 .totalMedicos(medicoRepository.count())
                 .desgloseMensual(desglose)
+                .build();
+    }
+
+    public AiMetricasResponse generarMetricasIA(boolean apiKeyActiva) {
+        long totalCitas = citaRepository.count();
+        long citasConTriage = citaRepository.countConTriage();
+        long citasConPiel = citaRepository.countConEvaluacionPiel();
+        long prioridadAlta = citaRepository.countPrioridadAlta();
+        long reprogramadasIA = cambioCitaRepository.countByRealizadoPor("SISTEMA_IA");
+
+        /* Distribución de severidad */
+        Map<String, Long> distribucion = new LinkedHashMap<>();
+        for (String sev : List.of("Rojo", "Naranja", "Amarillo", "Verde", "Azul")) {
+            distribucion.put(sev, 0L);
+        }
+        for (Object[] row : citaRepository.distribucionSeveridad()) {
+            String sev = (String) row[0];
+            Long cnt = (Long) row[1];
+            distribucion.put(sev, cnt);
+        }
+
+        String estadoConexion = apiKeyActiva ? "Operativo — API Key configurada" : "Modo Demo — sin API Key";
+
+        return AiMetricasResponse.builder()
+                .totalCitas(totalCitas)
+                .citasConTriage(citasConTriage)
+                .citasConEvaluacionPiel(citasConPiel)
+                .citasPrioridadAlta(prioridadAlta)
+                .citasReprogramadasPorIA(reprogramadasIA)
+                .distribucionSeveridad(distribucion)
+                .apiKeyActiva(apiKeyActiva)
+                .versionIa("Hospy AI v2.0 — LLM + Whisper + NER SOAP")
+                .estadoWhisper(apiKeyActiva ? "Operativo" : "Demo (navegador Web Speech API)")
+                .estadoSoap(apiKeyActiva ? "Operativo — LLM genera borrador SOAP" : "Demo — plantilla local")
+                .estadoTriage(apiKeyActiva ? "Operativo — análisis NLP" : "Demo — reglas de palabra clave")
+                .estadoDermatologia(apiKeyActiva ? "Operativo — análisis textual LLM" : "Demo — clasificación por texto")
+                .estadoInteracciones(apiKeyActiva ? "Operativo — LLM revisa interacciones" : "Demo — reglas predefinidas")
+                .estadoPrecios(apiKeyActiva ? "Operativo — estimación LLM" : "Demo — precios simulados")
+                .timeoutMedicoSeg(300)
+                .timeoutAdminSeg(10)
                 .build();
     }
 

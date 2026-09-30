@@ -55,6 +55,10 @@ export class MedicoService {
     return this.http.get<PacientePerfil>(`${this.api}/citas/${citaId}/paciente`);
   }
 
+  historialPaciente(citaId: number) {
+    return this.http.get<Cita[]>(`${this.api}/citas/${citaId}/historial-paciente`);
+  }
+
   misHorarios() {
     return this.http.get<Horario[]>(`${this.api}/horarios`);
   }

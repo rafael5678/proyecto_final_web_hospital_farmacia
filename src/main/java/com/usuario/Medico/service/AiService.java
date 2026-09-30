@@ -11,9 +11,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -24,7 +26,7 @@ public class AiService {
 
     public static final String MODO_DEMO_SIN_API_KEY =
             "MODO DEMO: Este resultado es una simulación educativa. " +
-                    "Configura la variable OPENAI_API_KEY en Render para activar el motor real (LLM GPT-4o / BERT clínico).";
+                "Configura OPENAI_API_KEY para solicitar una respuesta al proveedor de lenguaje configurado.";
 
     @Value("${ai.openai.api-key:}")
     private String apiKey;
@@ -35,14 +37,17 @@ public class AiService {
     @Value("${ai.openai.url:https://api.openai.com/v1/chat/completions}")
     private String apiUrl;
 
+    @Value("${ai.openai.audio-url:https://api.openai.com/v1/audio/transcriptions}")
+    private String audioApiUrl;
+
     @Value("${ai.openai.timeout-seconds:45}")
     private Integer timeout;
 
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
 
-    public AiService(ObjectMapper objectMapper) {
-        this.mapper = objectMapper;
+    public AiService() {
+        this.mapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -50,6 +55,49 @@ public class AiService {
 
     public boolean hayApiKey() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    public AiTranscripcionResponse transcribir(byte[] audio, String contentType) {
+        if (!hayApiKey()) {
+            return new AiTranscripcionResponse("", true, "Configura OPENAI_API_KEY para transcribir el audio con Whisper.");
+        }
+        String boundary = "HospyBoundary" + UUID.randomUUID();
+        try {
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            agregarParte(body, boundary, "model", "whisper-1");
+            agregarParte(body, boundary, "language", "es");
+            body.write(("--" + boundary + "\r\n" +
+                    "Content-Disposition: form-data; name=\"file\"; filename=\"consulta.webm\"\r\n" +
+                    "Content-Type: " + contentType + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            body.write(audio);
+            body.write("\r\n".getBytes(StandardCharsets.UTF_8));
+            body.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(audioApiUrl))
+                    .timeout(Duration.ofSeconds(timeout))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request,
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() != 200) {
+                log.warn("Transcripcion de audio fallo status={}", response.statusCode());
+                return new AiTranscripcionResponse("", true, "Whisper no pudo transcribir el audio. Revisa la conexión y vuelve a intentar.");
+            }
+            String texto = mapper.readTree(response.body()).path("text").asText("");
+            return new AiTranscripcionResponse(texto, false, "Transcripción Whisper lista para revisión médica.");
+        } catch (Exception ex) {
+            log.warn("Error en transcripcion de audio: {}", ex.getMessage());
+            return new AiTranscripcionResponse("", true, "No se pudo completar la transcripción. Revisa la conexión y vuelve a intentar.");
+        }
+    }
+
+    private void agregarParte(ByteArrayOutputStream body, String boundary, String nombre, String valor) throws Exception {
+        body.write(("--" + boundary + "\r\n" +
+                "Content-Disposition: form-data; name=\"" + nombre + "\"\r\n\r\n" +
+                valor + "\r\n").getBytes(StandardCharsets.UTF_8));
     }
 
     /* ============ Llamada genérica al LLM ============== */
@@ -91,7 +139,9 @@ public class AiService {
     /* ============ 1. Triage / NLP sintomas -> ESI/MTS ============== */
     public AiTriageResponse triage(AiTriageRequest req) {
         final String system = """
-                Eres un sistema de triage clínico NLP basado en escalas MTS (Manchester) y ESI (Emergency Severity Index).
+                Eres un asistente de lenguaje que organiza información sobre síntomas para revisión profesional.
+                No eres un servicio de urgencias ni un sistema clínico validado. No afirmes que aplicas oficialmente ESI/MTS.
+                Si no hay información suficiente, indica incertidumbre y recomienda valoración profesional.
                 Devuelve UNICAMENTE JSON con esta estructura (sin explicaciones):
                 {"severidad":"Rojo|Naranja|Amarillo|Verde|Azul","escala":"ESI/MTS 5 niveles","nivelEsi":1..5,
                  "especialidadRecomendada":"...","prioridad":1..10,
@@ -153,7 +203,9 @@ public class AiService {
     /* ============ 2. Dermatología (CNN simulado) ============== */
     public AiDermatologiaResponse dermatologia(AiDermatologiaRequest req) {
         final String system = """
-                Eres un modelo CNN pre-diagnóstico dermatológico tipo ResNet/EfficientNet B7.
+                Eres un asistente de lenguaje que organiza una descripción textual de una lesión para revisión profesional.
+                No procesas imágenes, no eres una CNN y no debes afirmar características visuales no descritas por el usuario.
+                No diagnostiques; destaca la incertidumbre y recomienda revisión clínica.
                 Responde SOLO JSON: {"nivelRiesgo":"BAJO|MEDIO|ALTO|CRITICO","scoreRiesgo":0.0..1.0,
                  "diagnosticosDiferenciales":["d1","d2"],"caracteristicasObservadas":["c1","c2"],
                  "recomendaciones":"...","advertencia":"no sustituye dermatólogo"}
@@ -204,7 +256,10 @@ public class AiService {
     /* ============ 3. Escriba SOAP médico ============== */
     public AiSoapResponse soap(AiSoapRequest req) {
         final String system = """
-                Eres un NER clínico + Whisper transcriptor. Estructura la transcripción en formato SOAP médico en JSON:
+                Estructura el texto proporcionado como un borrador SOAP para revisión médica.
+                No eres un sistema NER clínico validado. No inventes hallazgos, signos vitales, diagnósticos ni planes.
+                Para datos ausentes, escribe "No informado". El profesional debe revisar y firmar el borrador.
+                Devuelve JSON con esta estructura:
                 {"subjetivo":"...(S)","objetivo":"...(O signos/constantes)","apreciacion":"...(A impresión diagnóstica)",
                  "plan":"...(P: conducta, estudios, manejo)","diagnosticoPresuntivo":"...","procedimientosSugeridos":"..."}
                 """;
@@ -239,7 +294,8 @@ public class AiService {
     /* ============ 4. Interacciones Fármaco-Alimento (GNN) ============== */
     public AiInteraccionResponse interacciones(AiInteraccionRequest req) {
         final String system = """
-                Eres una GNN (Graph Neural Network) fármaco-alimento sobre DrugBank + Reactome.
+                Eres un asistente de lenguaje para señalar posibles interacciones a verificar por un farmacéutico.
+                No consultas DrugBank/Reactome ni eres una GNN; nunca presentes las respuestas como una verificación exhaustiva.
                 Devuelve JSON estricto: {"nivelRiesgoGlobal":"NINGUNO|BAJO|MEDIO|ALTO|SEVERO",
                  "alertas":[{"elementos":"fármaco + alimento","tipo":"FARMACO_FARMACO|FARMACO_ALIMENTO|FARMACO_SUPLEMENTO",
                              "severidad":"...","mecanismo":"...","consecuencia":"...","accion":"..."}],

@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
@@ -17,6 +17,18 @@ import {
 type MedicoTab = 'inicio' | 'citas' | 'horarios' | 'paciente' | 'soap' | 'precios';
 type MedicoSub = '' | 'todas' | 'pendientes' | 'aceptadas' | 'lista' | 'agregar';
 
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: { results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+type SpeechRecognitionFactory = new () => SpeechRecognitionLike;
+
 @Component({
   selector: 'app-medico-portal',
   standalone: true,
@@ -24,7 +36,7 @@ type MedicoSub = '' | 'todas' | 'pendientes' | 'aceptadas' | 'lista' | 'agregar'
   templateUrl: './medico-portal.component.html',
   styleUrl: './medico-portal.component.css'
 })
-export class MedicoPortalComponent implements OnInit {
+export class MedicoPortalComponent implements OnInit, OnDestroy {
   auth = inject(AuthService);
   private svc = inject(MedicoService);
   private ai = inject(AiService);
@@ -85,6 +97,8 @@ export class MedicoPortalComponent implements OnInit {
   citas = signal<Cita[]>([]);
   horarios = signal<Horario[]>([]);
   pacienteSeleccionado = signal<PacientePerfil | null>(null);
+  citaEnRevision = signal<Cita | null>(null);
+  historialPaciente = signal<Cita[]>([]);
 
   diaSemana = 1;
   horaInicio = '08:00';
@@ -98,6 +112,15 @@ export class MedicoPortalComponent implements OnInit {
   };
   soapRsp = signal<AiSoapResponse | null>(null);
   soapLoading = signal(false);
+  grabandoConsulta = signal(false);
+  transcribiendoAudio = signal(false);
+  consentimientoAudio = false;
+  consentimientoSoapAi = false;
+  transcripcionEnVivo = signal('');
+  vozError = signal('');
+  private grabadora: MediaRecorder | null = null;
+  private recognition: SpeechRecognitionLike | null = null;
+  private audioChunks: Blob[] = [];
 
   preciosReq: AiPreciosRequest = {
     medicamento: '',
@@ -114,6 +137,11 @@ export class MedicoPortalComponent implements OnInit {
     this.cargarCitas();
     this.cargarHorarios();
     this.svc.perfil().subscribe({ next: p => this.perfil.set(p) });
+  }
+
+  ngOnDestroy() {
+    this.recognition?.stop();
+    if (this.grabadora?.state === 'recording') this.grabadora.stop();
   }
 
   onNavigate(item: SidebarItem) {
@@ -189,9 +217,27 @@ export class MedicoPortalComponent implements OnInit {
   }
 
   verPaciente(citaId: number) {
+    this.citaEnRevision.set(this.citas().find(c => c.id === citaId) ?? null);
+    this.historialPaciente.set([]);
     this.svc.verPaciente(citaId).subscribe({
       next: p => {
         this.pacienteSeleccionado.set(p);
+        /* Auto-llenar SOAP con datos del paciente y triage */
+        const cita = this.citaEnRevision();
+        this.soapReq.nombrePaciente = p.nombre;
+        this.soapReq.motivoInicial = cita?.motivo || cita?.triageSintomas || '';
+        if (cita?.triageResumen && !this.soapReq.transcripcion) {
+          this.soapReq.transcripcion = `[Triage IA pre-consulta] Severidad: ${cita.triageSeveridad || 'N/A'}, ` +
+            `Prioridad: ${cita.triagePrioridad || 'N/A'}/10. ${cita.triageResumen}\n` +
+            (cita.triageSintomas ? `Síntomas: ${cita.triageSintomas}\n` : '') +
+            (cita.triageAntecedentes ? `Antecedentes: ${cita.triageAntecedentes}\n` : '') +
+            (cita.dermatologiaReportaIa ? `[Dermatología IA] ${cita.dermatologiaReportaIa}\n` : '') +
+            '\n--- Transcripción de consulta ---\n';
+        }
+        this.svc.historialPaciente(citaId).subscribe({
+          next: historial => this.historialPaciente.set(historial),
+          error: () => this.error.set('No se pudo cargar el historial previo del paciente.')
+        });
         this.tab.set('paciente');
         this.sub.set('');
       }
@@ -223,6 +269,10 @@ export class MedicoPortalComponent implements OnInit {
   }
 
   soapGenerar() {
+    if (!this.consentimientoSoapAi) {
+      this.error.set('Confirma que el paciente autorizó el envío de la transcripción al servicio de IA.');
+      return;
+    }
     const tx = (this.soapReq.transcripcion || this.soapReq.transcripcionConsulta || '').trim();
     if (!tx) {
       this.error.set('Escriba o pegue la transcripción de la consulta.');
@@ -234,8 +284,89 @@ export class MedicoPortalComponent implements OnInit {
     this.soapLoading.set(true);
     this.ai.soap(this.soapReq).subscribe({
       next: r => this.soapRsp.set(r),
-      error: () => this.error.set('Error al generar SOAP. Reintente.'),
       complete: () => this.soapLoading.set(false)
+    });
+  }
+
+  async iniciarGrabacion() {
+    this.vozError.set('');
+    if (!this.consentimientoAudio) {
+      this.vozError.set('Confirma el consentimiento antes de grabar y enviar audio clínico.');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      this.vozError.set('Este navegador no permite grabar audio. Puedes escribir la transcripción.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.audioChunks = [];
+      this.transcripcionEnVivo.set('');
+      this.grabadora = new MediaRecorder(stream);
+      this.grabadora.ondataavailable = event => {
+        if (event.data.size) this.audioChunks.push(event.data);
+      };
+      this.grabadora.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+        const audio = new Blob(this.audioChunks, { type: this.grabadora?.mimeType || 'audio/webm' });
+        if (audio.size) this.subirAudio(audio);
+      };
+      this.grabadora.start();
+      this.grabandoConsulta.set(true);
+      this.iniciarReconocimientoNavegador();
+    } catch {
+      this.vozError.set('No se pudo acceder al micrófono. Revisa permisos del navegador.');
+    }
+  }
+
+  detenerGrabacion() {
+    this.recognition?.stop();
+    this.recognition = null;
+    this.grabandoConsulta.set(false);
+    if (this.grabadora?.state === 'recording') this.grabadora.stop();
+  }
+
+  private iniciarReconocimientoNavegador() {
+    const speechWindow = window as Window & {
+      SpeechRecognition?: SpeechRecognitionFactory;
+      webkitSpeechRecognition?: SpeechRecognitionFactory;
+    };
+    const Factory = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Factory) return;
+    this.recognition = new Factory();
+    this.recognition.lang = 'es-CO';
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    this.recognition.onresult = event => {
+      const text = Array.from(event.results).map(result => result[0].transcript).join(' ');
+      this.transcripcionEnVivo.set(text);
+    };
+    this.recognition.onerror = () => this.vozError.set('La transcripción en vivo del navegador no está disponible; Whisper intentará transcribir al terminar.');
+    try {
+      this.recognition.start();
+    } catch {
+      this.vozError.set('No se pudo iniciar la transcripción en vivo.');
+    }
+  }
+
+  private subirAudio(audio: Blob) {
+    this.transcribiendoAudio.set(true);
+    this.ai.transcribir(audio).subscribe({
+      next: result => {
+        const texto = result.texto.trim() || this.transcripcionEnVivo().trim();
+        if (texto) {
+          const previo = this.soapReq.transcripcion?.trim();
+          this.soapReq.transcripcion = [previo, texto].filter(Boolean).join('\n');
+        }
+        this.vozError.set(result.mensaje);
+        this.transcribiendoAudio.set(false);
+      },
+      error: () => {
+        const texto = this.transcripcionEnVivo().trim();
+        if (texto) this.soapReq.transcripcion = [this.soapReq.transcripcion?.trim(), texto].filter(Boolean).join('\n');
+        this.vozError.set('No se pudo enviar el audio a Whisper. Se conservó la transcripción del navegador, si estaba disponible.');
+        this.transcribiendoAudio.set(false);
+      }
     });
   }
 

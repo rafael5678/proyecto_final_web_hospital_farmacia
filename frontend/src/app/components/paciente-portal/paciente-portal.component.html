@@ -18,7 +18,7 @@
       <button type="button" class="btn logout" (click)="auth.logout()">Cerrar sesión</button>
     </header>
 
-    <main class="portal-content">
+    <main class="portal-content paciente-content">
       @if (ok()) { <div class="alert ok">{{ ok() }}</div> }
       @if (error()) { <div class="alert err">{{ error() }}</div> }
 
@@ -49,13 +49,56 @@
       }
 
       @if (tab() === 'agendar') {
-        <div class="card section">
+        <div class="card section booking-card">
           <h2 class="section-title">Agendar cita médica</h2>
-          <label>Médico</label>
+          <p class="hint">Cuéntanos qué ocurre para orientar la prioridad y asignar una especialidad. El triage de IA no es un diagnóstico ni sustituye una valoración médica.</p>
+          <label>Síntomas y motivo de consulta *</label>
+          <textarea class="input" rows="4" [(ngModel)]="sintomas" (ngModelChange)="triageCambiar()" placeholder="Describe qué sientes, desde cuándo y cómo ha cambiado..."></textarea>
+          <div class="form-row">
+            <div>
+              <label>Duración</label>
+              <input class="input" [(ngModel)]="duracionSintomas" (ngModelChange)="triageCambiar()" placeholder="Ej. desde hace 2 días" />
+            </div>
+            <div>
+              <label>Antecedentes, alergias o enfermedades</label>
+              <input class="input" [(ngModel)]="antecedentesSintomas" (ngModelChange)="triageCambiar()" placeholder="Ej. asma, alergia a penicilina" />
+            </div>
+          </div>
+          <label class="check-row"><input type="checkbox" [(ngModel)]="tieneLesionPiel" (ngModelChange)="triageCambiar()" /> También tengo un problema de piel o una lesión</label>
+          @if (tieneLesionPiel) {
+            <label>Describe la lesión o cambio en la piel</label>
+            <textarea class="input" rows="3" [(ngModel)]="dermReq.descripcion" (ngModelChange)="dermRsp.set(null)" placeholder="Ubicación, aspecto, evolución, dolor o sangrado..."></textarea>
+          }
+          <label class="check-row"><input type="checkbox" [(ngModel)]="consentimientoTriage" /> Autorizo enviar mis síntomas y antecedentes al servicio de IA para esta orientación.</label>
+          <button type="button" class="btn btn-green" (click)="triageAnalizar()" [disabled]="triageLoading() || !sintomas.trim() || !consentimientoTriage">
+            {{ triageLoading() ? 'Analizando...' : 'Analizar síntomas' }}
+          </button>
+          @if (triageRsp(); as triage) {
+            <div class="triage-result" role="status">
+              <strong>Orientación: {{ triage.severidad }} · Nivel {{ triage.nivelEsi }}/5</strong>
+              <p>{{ triage.resumen }}</p>
+              <p>Especialidad sugerida: {{ triage.especialidadRecomendada }} · Prioridad orientativa: {{ triage.prioridad }}/10</p>
+              @if (triage.modoDemo) { <p class="hint">Resultado de demostración: la IA clínica real no está configurada. No uses este resultado para decidir si esperar.</p> }
+              <p class="hint">Si tienes dificultad intensa para respirar, dolor fuerte en el pecho, pérdida del conocimiento u otra emergencia, contacta urgencias ahora.</p>
+            </div>
+          }
+          @if (tieneLesionPiel && dermRsp(); as derm) {
+            <div class="triage-result" role="status">
+              <strong>Orientación de piel: {{ derm.nivelRiesgo }} ({{ derm.scoreRiesgo }})</strong>
+              <p>{{ derm.advertencia }}</p>
+              @if (derm.modoDemo) { <p class="hint">Análisis de demostración basado en texto; no se ha procesado una imagen clínica.</p> }
+            </div>
+          }
+          @if (tieneLesionPiel) {
+            <button type="button" class="btn btn-green" (click)="dermAnalizar()" [disabled]="dermLoading() || !dermReq.descripcion.trim() || !consentimientoTriage">
+              {{ dermLoading() ? 'Analizando piel...' : 'Analizar lesión de piel' }}
+            </button>
+          }
+          <label>Médico (filtrado por especialidad sugerida)</label>
           <select class="input" [(ngModel)]="medicoId" (ngModelChange)="onMedicoChange()">
             <option [ngValue]="null">Selecciona un médico</option>
-            @for (m of medicos(); track m.id) {
-              <option [ngValue]="m.id">{{ m.nombre }} — {{ m.especialidad }}</option>
+            @for (m of medicosFiltrados(); track m.id) {
+              <option [ngValue]="m.id">{{ m.nombre }} — {{ m.especialidad }}{{ triageRsp()?.especialidadRecomendada === m.especialidad ? ' (sugerido por IA)' : '' }}</option>
             }
           </select>
           @if (horarios().length) {
@@ -66,11 +109,11 @@
               }
             </ul>
           }
-          <label>Fecha y hora</label>
+          <label>Fecha y hora preferidas</label>
           <input class="input" type="datetime-local" [(ngModel)]="fechaHora" />
-          <label>Motivo de consulta</label>
-          <input class="input" [(ngModel)]="motivo" placeholder="Consulta general, control..." />
-          <button type="button" class="btn btn-green" (click)="agendar()" [disabled]="loading()">Agendar cita</button>
+          <label>Nota adicional para el médico</label>
+          <input class="input" [(ngModel)]="motivo" placeholder="Información adicional (opcional)" />
+          <button type="button" class="btn btn-green" (click)="agendar()" [disabled]="loading() || !triageRsp() || (tieneLesionPiel && !dermRsp())">{{ loading() ? 'Agendando...' : 'Agendar cita' }}</button>
         </div>
       }
 
@@ -177,80 +220,16 @@
         </div>
       }
 
-      @if (tab() === 'triage') {
-        <div class="card section form-grid ai-panel">
-          <h2 class="section-title">🤖 Triage inteligente (NLP / MTS · ESI)</h2>
-          <p class="info-msg">Describe tus síntomas en lenguaje natural — nuestro modelo BERT/RoBERTa clínico infiere severidad, especialidad y prioridad.</p>
-          <div class="full"><label>Síntomas *</label><textarea class="input big" rows="5" [(ngModel)]="triageReq.sintomas" placeholder="Ej: dolor de cabeza fuerte desde ayer, fiebre de 38.5, mareos al levantarme..."></textarea></div>
-          <div><label>Duración aproximada</label><input class="input" [(ngModel)]="triageReq.duracion" placeholder="Ej: 48 horas, 1 semana..." /></div>
-          <div><label>Edad</label><input class="input" type="number" [(ngModel)]="triageReq.edadPaciente" /></div>
-          <div class="full"><label>Antecedentes / alergias conocidas</label><textarea class="input" rows="3" [(ngModel)]="triageReq.antecedentes" placeholder="Hipertensión, asma, diabetes, alergia a penicilina..."></textarea></div>
-          <div class="full">
-            <button type="button" class="btn btn-green full" (click)="triageAnalizar()" [disabled]="triageLoading()">
-              {{ triageLoading() ? 'Analizando síntomas...' : '🔬 Analizar con IA' }}
-            </button>
-          </div>
-
-          @if (triageRsp(); as t) {
-            <div class="ai-result">
-              <div class="severity-row">
-                <span class="severity-chip" [class]="severidadColor(t.severidad)">{{ t.severidad }}</span>
-                <span class="chip-outline">ESI nivel {{ t.nivelEsi }}</span>
-                <span class="chip-outline">Prioridad {{ t.prioridad }}/10</span>
-                <span class="chip-outline">Especialidad: {{ t.especialidadRecomendada }}</span>
-                @if (t.modoDemo) { <span class="chip-outline demo">MODO DEMO</span> }
-              </div>
-              <p><strong>Resumen:</strong> {{ t.resumen }}</p>
-              <p><strong>Escala usada:</strong> {{ t.escala }}</p>
-              <p><strong>Hallazgos:</strong></p>
-              <ul> @for (h of t.hallazgos; track h) { <li>{{ h }}</li> } </ul>
-              <div class="reco"><strong>Recomendaciones:</strong><br/>{{ t.recomendaciones }}</div>
-            </div>
-          }
-        </div>
-      }
-
-      @if (tab() === 'dermatologia') {
-        <div class="card section form-grid ai-panel">
-          <h2 class="section-title">🤖 Pre-diagnóstico cutáneo (ResNet / EfficientNet)</h2>
-          <p class="info-msg">Describe la lesión. Nuestra CNN analiza características (asimetría, bordes, color, diámetro, evolución) y reporta riesgo.</p>
-          <div class="full"><label>Descripción de la lesión *</label><textarea class="input big" rows="5" [(ngModel)]="dermReq.descripcion" placeholder="Ej: Mancha marrón de 6mm en el brazo, apareció hace 2 meses, pica un poco, asimétrica, bordes irregulares..."></textarea></div>
-          <div><label>Tiempo de evolución</label><input class="input" [(ngModel)]="dermReq.tiempoEvolucion" placeholder="2 semanas, 3 meses..." /></div>
-          <div><label>Síntomas asociados</label><input class="input" [(ngModel)]="dermReq.sintomasAsociados" placeholder="Picor, ardor, sangrado..."></div>
-          <div class="full">
-            <button type="button" class="btn btn-green full" (click)="dermAnalizar()" [disabled]="dermLoading()">
-              {{ dermLoading() ? 'Analizando lesión...' : '🔬 Analizar con IA' }}
-            </button>
-          </div>
-
-          @if (dermRsp(); as d) {
-            <div class="ai-result">
-              <div class="severity-row">
-                <span class="severity-chip" [class]="severidadColor(d.nivelRiesgo)">RIESGO {{ d.nivelRiesgo }}</span>
-                <span class="chip-outline">Score: {{ (d.scoreRiesgo * 100).toFixed(1) }}%</span>
-                @if (d.modoDemo) { <span class="chip-outline demo">MODO DEMO</span> }
-              </div>
-              <p class="warn-big"><strong>⚠️ {{ d.advertencia }}</strong></p>
-              <p><strong>Diagnósticos diferenciales:</strong></p>
-              <ul> @for (dx of d.diagnosticosDiferenciales; track dx) { <li>{{ dx }}</li> } </ul>
-              <p><strong>Características observadas:</strong></p>
-              <ul> @for (c of d.caracteristicasObservadas; track c) { <li>{{ c }}</li> } </ul>
-              <div class="reco"><strong>Recomendaciones:</strong><br/>{{ d.recomendaciones }}</div>
-            </div>
-          }
-        </div>
-      }
-
       @if (tab() === 'interacciones') {
         <div class="card section form-grid ai-panel">
-          <h2 class="section-title">💊 Interacciones Fármaco + Alimento (GNN DrugBank)</h2>
-          <p class="info-msg">Nuestra Graph Neural Network evalúa interacciones graves entre tus medicamentos, dieta y suplementos. Escribe listas separadas por coma.</p>
+          <h2 class="section-title">💊 Revisión orientativa de medicamentos</h2>
+          <p class="info-msg">Un modelo de lenguaje puede señalar preguntas para tu médico o farmacéutico; no consulta un catálogo farmacológico validado ni confirma que la lista esté libre de interacciones. No cambies tu tratamiento con esta respuesta.</p>
           <div class="full"><label>Medicamentos que consumes (separados por coma) *</label><textarea class="input" rows="3" [(ngModel)]="interMed" placeholder="Atorvastatina 20mg, Warfarina 5mg, Omeprazol..."></textarea></div>
           <div class="full"><label>Dieta habitual / alimentos que consumes frecuentemente</label><textarea class="input" rows="3" [(ngModel)]="interDieta" placeholder="Jugo de toronja, espinaca, brócoli, lácteos, alcohol..."></textarea></div>
           <div class="full"><label>Suplementos o vitaminas</label><textarea class="input" rows="2" [(ngModel)]="interSuplem" placeholder="Vitamina K, Omega 3, Magnesio..."></textarea></div>
           <div class="full">
             <button type="button" class="btn btn-green full" (click)="interAnalizar()" [disabled]="interLoading()">
-              {{ interLoading() ? 'Evaluando grafo de interacciones...' : '🔬 Evaluar con IA' }}
+              {{ interLoading() ? 'Revisando...' : 'Revisar con IA' }}
             </button>
           </div>
 
@@ -280,15 +259,15 @@
 
       @if (tab() === 'precios') {
         <div class="card section form-grid ai-panel">
-          <h2 class="section-title">💊 Triangulación de precios (Isolation Forest + Prophet)</h2>
-          <p class="info-msg">Comparamos tu precio reportado con cadenas nacionales e importadoras. Detectamos sobreprecios y desabastecimiento artificial especulativo.</p>
+          <h2 class="section-title">💊 Estimación orientativa de precios</h2>
+          <p class="info-msg">La aplicación no consulta precios de farmacias ni series históricas. Las comparativas y estimaciones pueden ser demostrativas; verifica precios directamente con el establecimiento.</p>
           <div><label>Medicamento *</label><input class="input" [(ngModel)]="preciosReq.medicamento" placeholder="Ej: Acetaminofén 500mg x 20 tabletas" /></div>
           <div><label>Presentación</label><input class="input" [(ngModel)]="preciosReq.presentacion" placeholder="Tabletas, cápsulas, ampollas..." /></div>
           <div><label>Precio que te cobraron (COP)</label><input class="input" type="number" [(ngModel)]="preciosPrecioTxt" placeholder="45000" /></div>
           <div><label>Ciudad</label><input class="input" [(ngModel)]="preciosReq.ciudad" placeholder="Pasto, Bogotá, Cali..." /></div>
           <div class="full">
             <button type="button" class="btn btn-green full" (click)="preciosAnalizar()" [disabled]="preciosLoading()">
-              {{ preciosLoading() ? 'Triangulando precios...' : '🔬 Comparar precios' }}
+              {{ preciosLoading() ? 'Estimando...' : 'Generar estimación' }}
             </button>
           </div>
 

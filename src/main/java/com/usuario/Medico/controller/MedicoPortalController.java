@@ -53,6 +53,11 @@ public class MedicoPortalController {
         return ResponseEntity.ok(citaService.pacienteDeCita(id, emailActual()));
     }
 
+    @GetMapping("/citas/{id}/historial-paciente")
+    public ResponseEntity<List<CitaResponse>> historialPaciente(@PathVariable Long id) {
+        return ResponseEntity.ok(citaService.historialPacienteDeCita(id, emailActual()));
+    }
+
     @GetMapping("/horarios")
     public ResponseEntity<List<HorarioResponse>> misHorarios() {
         return ResponseEntity.ok(horarioService.misHorarios(emailActual()));

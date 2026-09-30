@@ -5,8 +5,12 @@ import com.usuario.Medico.service.AiService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -20,7 +24,7 @@ public class AiController {
     public ResponseEntity<AiStatusResponse> status() {
         return ResponseEntity.ok(new AiStatusResponse(
                 aiService.hayApiKey(),
-                "Hospy AI v1.0 — Triage NLP / Dermatologia CNN / Escriba SOAP / Interacciones GNN / Precios IF+Prophet"
+                "Hospy AI — asistente de lenguaje y transcripción Whisper; requiere revisión profesional"
         ));
     }
 
@@ -43,6 +47,20 @@ public class AiController {
     @PreAuthorize("hasAnyRole('MEDICO','ADMIN')")
     public ResponseEntity<AiSoapResponse> soap(@Valid @RequestBody AiSoapRequest req) {
         return ResponseEntity.ok(aiService.soap(req));
+    }
+
+    @PostMapping(value = "/transcribir", consumes = "multipart/form-data")
+    @PreAuthorize("hasAnyRole('MEDICO','ADMIN')")
+    public ResponseEntity<AiTranscripcionResponse> transcribir(@RequestParam("audio") MultipartFile audio) throws IOException {
+        if (audio.isEmpty()) return ResponseEntity.badRequest().build();
+        if (audio.getSize() > 10 * 1024 * 1024) return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).build();
+        String tipo = audio.getContentType() == null ? "" : audio.getContentType().toLowerCase();
+        if (!tipo.startsWith("audio/webm") && !tipo.startsWith("audio/mp4") &&
+                !tipo.startsWith("audio/wav") && !tipo.startsWith("audio/ogg") &&
+                !tipo.startsWith("audio/mpeg")) {
+            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).build();
+        }
+        return ResponseEntity.ok(aiService.transcribir(audio.getBytes(), tipo));
     }
 
     /* Pacientes, médicos y admins pueden revisar interacciones */

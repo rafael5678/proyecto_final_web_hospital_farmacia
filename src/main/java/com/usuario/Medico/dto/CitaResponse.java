@@ -19,4 +19,16 @@ public class CitaResponse {
     private String estado;
     private String motivo;
     private String notas;
+    private String triageSeveridad;
+    private Integer triageNivelEsi;
+    private Integer triagePrioridad;
+    private String triageEspecialidadSugerida;
+    private String triageResumen;
+    private String triageSintomas;
+    private String triageDuracion;
+    private String triageAntecedentes;
+    private String dermatologiaReportaIa;
+    private Double dermatologiaScoreRiesgo;
+    private String dermatologiaTopDiagnostico;
+    private String avisoAgenda;
 }

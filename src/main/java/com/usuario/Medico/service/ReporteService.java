@@ -80,7 +80,7 @@ public class ReporteService {
                 .estadoInteracciones(apiKeyActiva ? "Operativo — LLM revisa interacciones" : "Demo — reglas predefinidas")
                 .estadoPrecios(apiKeyActiva ? "Operativo — estimación LLM" : "Demo — precios simulados")
                 .timeoutMedicoSeg(300)
-                .timeoutAdminSeg(10)
+                .timeoutAdminSeg(600)
                 .build();
     }
 

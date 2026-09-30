@@ -36,7 +36,7 @@ export class SessionTimeoutComponent implements OnInit, OnDestroy {
   private inactivity = inject(InactivityService);
   seconds = signal(0);
 
-  warningAt = computed(() => this.rol() === 'ADMIN' ? 5 : 60);
+  warningAt = computed(() => this.rol() === 'ADMIN' ? 60 : 60);
 
   label = computed(() => {
     const s = this.seconds();

@@ -43,6 +43,15 @@ public class UsuarioService {
             throw new RuntimeException("El email ya existe");
         }
         Rol rol = Rol.valueOf(req.getRol().toUpperCase());
+        if (rol == Rol.ADMIN) {
+            throw new RuntimeException("Solo existe un administrador. No se pueden crear más por seguridad.");
+        }
+        if (rol == Rol.MEDICO && (req.getEspecialidad() == null || req.getEspecialidad().isBlank())) {
+            throw new RuntimeException("El médico requiere especialidad.");
+        }
+        if (rol == Rol.PACIENTE && (req.getDocumento() == null || req.getDocumento().isBlank())) {
+            throw new RuntimeException("El paciente requiere documento de identidad.");
+        }
         Usuario usuario = Usuario.builder()
                 .nombre(req.getNombre())
                 .email(req.getEmail())
@@ -74,6 +83,9 @@ public class UsuarioService {
 
     public void eliminar(Long id) {
         Usuario usuario = buscar(id);
+        if (usuario.getRol() == Rol.ADMIN) {
+            throw new RuntimeException("El administrador único no se puede desactivar.");
+        }
         usuario.setActivo(false);
         usuarioRepository.save(usuario);
     }

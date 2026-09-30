@@ -25,4 +25,9 @@ public class UsuarioRequest {
     private String departamento;
     private String extensionTelefonica;
     private Boolean activo;
+    private String fechaNacimiento;
+    private String genero;
+    private String tipoSangre;
+    private String ciudad;
+    private String alergias;
 }

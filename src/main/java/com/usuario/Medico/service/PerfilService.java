@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 @Service
 @RequiredArgsConstructor
 public class PerfilService {
@@ -24,6 +26,11 @@ public class PerfilService {
             case PACIENTE -> pacienteRepository.save(Paciente.builder()
                     .usuario(usuario)
                     .documento(req.getDocumento())
+                    .fechaNacimiento(parseFecha(req.getFechaNacimiento()))
+                    .genero(req.getGenero())
+                    .tipoSangre(req.getTipoSangre())
+                    .ciudad(req.getCiudad())
+                    .alergias(req.getAlergias())
                     .build());
             case MEDICO -> medicoRepository.save(Medico.builder()
                     .usuario(usuario)
@@ -33,12 +40,16 @@ public class PerfilService {
                     .anosExperiencia(req.getAnosExperiencia())
                     .biografia(req.getBiografia())
                     .build());
-            case ADMIN -> administradorRepository.save(Administrador.builder()
-                    .usuario(usuario)
-                    .cargo(req.getCargo() != null ? req.getCargo() : "Administrador")
-                    .departamento(req.getDepartamento())
-                    .extensionTelefonica(req.getExtensionTelefonica())
-                    .build());
+            case ADMIN -> throw new RuntimeException("No se puede crear otro administrador.");
+        }
+    }
+
+    private static LocalDate parseFecha(String valor) {
+        if (valor == null || valor.isBlank()) return null;
+        try {
+            return LocalDate.parse(valor);
+        } catch (RuntimeException ex) {
+            return null;
         }
     }
 

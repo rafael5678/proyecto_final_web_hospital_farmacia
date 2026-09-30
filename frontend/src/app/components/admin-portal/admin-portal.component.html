@@ -58,19 +58,18 @@
 
       @if (tab() === 'usuarios' && sub() === 'crear') {
         <div class="card section form-grid">
-          <h2>Registrar usuario</h2>
-          <input class="input" placeholder="Nombre" [(ngModel)]="form.nombre" />
+          <h2>Registrar paciente</h2>
+          <p class="hint">Ficha clínica del paciente. El único administrador del sistema no se puede duplicar.</p>
+          <input class="input" placeholder="Nombre completo" [(ngModel)]="form.nombre" />
           <input class="input" placeholder="Email" [(ngModel)]="form.email" />
           <input class="input" type="password" placeholder="Contraseña" [(ngModel)]="form.password" />
-          <select class="input" [(ngModel)]="form.rol">
-            <option value="PACIENTE">PACIENTE</option>
-            <option value="MEDICO">MEDICO</option>
-            <option value="ADMIN">ADMIN</option>
-          </select>
           <input class="input" placeholder="Teléfono" [(ngModel)]="form.telefono" />
-          <input class="input" placeholder="Documento (paciente)" [(ngModel)]="form.documento" />
-          <input class="input" placeholder="Especialidad (médico)" [(ngModel)]="form.especialidad" />
-          <button type="button" class="btn btn-purple" (click)="crearUsuario()">Crear usuario</button>
+          <input class="input" placeholder="Documento de identidad" [(ngModel)]="form.documento" />
+          <input class="input" type="date" [(ngModel)]="form.fechaNacimiento" />
+          <input class="input" placeholder="Género" [(ngModel)]="form.genero" />
+          <input class="input" placeholder="Ciudad" [(ngModel)]="form.ciudad" />
+          <input class="input" placeholder="Alergias / antecedentes" [(ngModel)]="form.alergias" />
+          <button type="button" class="btn btn-purple" (click)="crearUsuario()">Crear paciente</button>
           @if (error()) { <p class="error-msg">{{ error() }}</p> }
         </div>
       }
@@ -102,11 +101,16 @@
       @if (tab() === 'medicos' && sub() === 'crear') {
         <div class="card section form-grid">
           <h2>Registrar médico</h2>
+          <p class="hint">Datos profesionales. La especialidad se usa al agendar por triage.</p>
           <input class="input" placeholder="Nombre" [(ngModel)]="form.nombre" />
           <input class="input" placeholder="Email" [(ngModel)]="form.email" />
           <input class="input" type="password" placeholder="Contraseña" [(ngModel)]="form.password" />
-          <input class="input" placeholder="Especialidad" [(ngModel)]="form.especialidad" />
+          <input class="input" placeholder="Especialidad (Cardiología, Neurología...)" [(ngModel)]="form.especialidad" />
+          <input class="input" placeholder="Número de licencia" [(ngModel)]="form.numeroLicencia" />
+          <input class="input" placeholder="Consultorio" [(ngModel)]="form.consultorio" />
+          <input class="input" type="number" placeholder="Años de experiencia" [(ngModel)]="form.anosExperiencia" />
           <input class="input" placeholder="Teléfono" [(ngModel)]="form.telefono" />
+          <textarea class="input" placeholder="Biografía profesional" [(ngModel)]="form.biografia"></textarea>
           <button type="button" class="btn btn-purple" (click)="crearUsuario()">Crear médico</button>
           @if (error()) { <p class="error-msg">{{ error() }}</p> }
         </div>
@@ -306,8 +310,8 @@
               <div class="card inner ai-superv-card sec">
                 <h4>🔐 Seguridad sesiones</h4>
                 <ul>
-                  <li>⏱ Médicos: <strong>{{ m.timeoutMedicoSeg / 60 }} min</strong> inactividad</li>
-                  <li>⏱ Administradores: <strong>{{ m.timeoutAdminSeg }} s</strong> inactividad</li>
+                  <li>⏱ Médicos: <strong>5 min</strong> inactividad</li>
+                  <li>⏱ Administradores: <strong>10 min</strong> inactividad</li>
                   <li>✅ JWT interceptores</li>
                   <li>✅ Guards de rol y autenticación</li>
                 </ul>

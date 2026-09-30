@@ -39,7 +39,7 @@ export class AdminPortalComponent implements OnInit {
       icon: '👥',
       children: [
         { id: 'u-lista', label: 'Listar usuarios', tab: 'usuarios', sub: 'lista' },
-        { id: 'u-crear', label: 'Registrar usuario', tab: 'usuarios', sub: 'crear' }
+        { id: 'u-crear', label: 'Registrar paciente', tab: 'usuarios', sub: 'crear' }
       ]
     },
     {
@@ -93,7 +93,9 @@ export class AdminPortalComponent implements OnInit {
 
   form: UsuarioRequest = {
     nombre: '', email: '', password: '', rol: 'PACIENTE',
-    telefono: '', documento: '', especialidad: ''
+    telefono: '', documento: '', especialidad: '',
+    fechaNacimiento: '', genero: '', ciudad: '', alergias: '',
+    numeroLicencia: '', consultorio: '', anosExperiencia: undefined, biografia: ''
   };
   error = signal('');
 
@@ -154,7 +156,7 @@ export class AdminPortalComponent implements OnInit {
     const map: Record<string, string> = {
       inicio: 'Panel de inicio',
       'usuarios-lista': 'Usuarios — listado',
-      'usuarios-crear': 'Usuarios — registrar',
+      'usuarios-crear': 'Pacientes — registrar',
       'medicos-lista': 'Médicos — listado',
       'medicos-crear': 'Médicos — registrar',
       'citas-supervision': 'Citas — supervisión',
@@ -233,18 +235,25 @@ export class AdminPortalComponent implements OnInit {
   }
 
   crearUsuario() {
-    const req = { ...this.form };
-    const obs = this.tab() === 'medicos'
-      ? this.adminService.crearMedico({ ...req, rol: 'MEDICO' })
-      : this.adminService.crearUsuario(req);
-    obs.subscribe({
-      next: () => {
-        this.resetForm();
-        this.cargarUsuarios();
-        this.cargarMedicos();
-        this.sub.set('lista');
-      },
-      error: (e) => this.error.set(e.error?.error ?? 'Error')
+    this.error.set('');
+    if (this.tab() === 'medicos') {
+      if (!this.form.especialidad?.trim()) {
+        this.error.set('Indica la especialidad del médico.');
+        return;
+      }
+      this.adminService.crearMedico({ ...this.form, rol: 'MEDICO' }).subscribe({
+        next: () => { this.resetForm(); this.cargarMedicos(); this.cargarUsuarios(); this.sub.set('lista'); },
+        error: (e) => this.error.set(e.error?.error ?? 'Error al crear médico')
+      });
+      return;
+    }
+    if (!this.form.documento?.trim()) {
+      this.error.set('El paciente requiere documento.');
+      return;
+    }
+    this.adminService.crearUsuario({ ...this.form, rol: 'PACIENTE' }).subscribe({
+      next: () => { this.resetForm(); this.cargarUsuarios(); this.sub.set('lista'); },
+      error: (e) => this.error.set(e.error?.error ?? 'Error al crear paciente')
     });
   }
 
@@ -257,7 +266,12 @@ export class AdminPortalComponent implements OnInit {
   }
 
   resetForm() {
-    this.form = { nombre: '', email: '', password: '', rol: 'PACIENTE', telefono: '', documento: '', especialidad: '' };
+    this.form = {
+      nombre: '', email: '', password: '', rol: 'PACIENTE',
+      telefono: '', documento: '', especialidad: '',
+      fechaNacimiento: '', genero: '', ciudad: '', alergias: '',
+      numeroLicencia: '', consultorio: '', anosExperiencia: undefined, biografia: ''
+    };
     this.error.set('');
   }
 

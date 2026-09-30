@@ -33,6 +33,49 @@ public class DataInitializer implements CommandLineRunner {
         asegurarAdminDemo();
         migrarPerfilesExistentes();
         asegurarMedicoDemo();
+        asegurarMedico("neurologia@hospy.com", "Dra. Ana López", "Neurología", "MED-2024-002");
+        asegurarMedico("dermatologia@hospy.com", "Dr. Carlos Pérez", "Dermatología", "MED-2024-003");
+        asegurarPacienteDemo("pedro@hospy.com", "Pedro Paciente", "123456");
+        asegurarPacienteDemo("paciente@hospy.com", "Juan Reyes", "Paciente123");
+    }
+
+    private void asegurarPacienteDemo(String email, String nombre, String clave) {
+        usuarioRepository.findByEmail(email).ifPresentOrElse(u -> {
+            u.setPassword(passwordEncoder.encode(clave));
+            u.setRol(Rol.PACIENTE);
+            u.setActivo(true);
+            u.setNombre(nombre);
+            usuarioRepository.save(u);
+            if (pacienteRepository.findByUsuario(u).isEmpty()) {
+                RegisterRequest r = new RegisterRequest();
+                r.setDocumento("CC-DEMO");
+                perfilService.crearPaciente(u, r);
+            }
+        }, () -> {
+            Usuario u = usuarioRepository.save(Usuario.builder()
+                    .nombre(nombre).email(email)
+                    .password(passwordEncoder.encode(clave))
+                    .rol(Rol.PACIENTE).activo(true).build());
+            RegisterRequest r = new RegisterRequest();
+            r.setDocumento("CC-DEMO");
+            perfilService.crearPaciente(u, r);
+        });
+    }
+
+    private void asegurarMedico(String email, String nombre, String especialidad, String licencia) {
+        if (usuarioRepository.findByEmail(email).isPresent()) return;
+        UsuarioRequest req = new UsuarioRequest();
+        req.setNombre(nombre);
+        req.setEmail(email);
+        req.setPassword("Medico123");
+        req.setRol("MEDICO");
+        req.setEspecialidad(especialidad);
+        req.setNumeroLicencia(licencia);
+        Usuario u = usuarioRepository.save(Usuario.builder()
+                .nombre(nombre).email(email)
+                .password(passwordEncoder.encode("Medico123"))
+                .rol(Rol.MEDICO).activo(true).build());
+        perfilService.crearPerfil(u, req);
     }
 
     /** Credenciales fijas de demo (se reactivan y restablecen al arrancar). */

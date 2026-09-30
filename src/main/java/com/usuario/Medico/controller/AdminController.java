@@ -31,6 +31,7 @@ public class AdminController {
 
     @PostMapping("/usuarios")
     public ResponseEntity<UsuarioDTO> crearUsuario(@Valid @RequestBody UsuarioRequest request) {
+        request.setRol("PACIENTE");
         return ResponseEntity.ok(usuarioService.crear(request));
     }
 

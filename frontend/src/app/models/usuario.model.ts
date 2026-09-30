@@ -21,5 +21,13 @@ export interface UsuarioRequest {
   telefono?: string;
   documento?: string;
   especialidad?: string;
+  fechaNacimiento?: string;
+  genero?: string;
+  ciudad?: string;
+  alergias?: string;
+  numeroLicencia?: string;
+  consultorio?: string;
+  anosExperiencia?: number;
+  biografia?: string;
   activo?: boolean;
 }

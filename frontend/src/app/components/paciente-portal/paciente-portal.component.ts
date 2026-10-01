@@ -190,11 +190,34 @@ export class PacientePortalComponent implements OnInit {
   }
 
   medicosFiltrados(): Usuario[] {
-    const sugerida = this.triageRsp()?.especialidadRecomendada?.toLowerCase() || '';
-    const f = (this.filtroEspecialidad || sugerida).toLowerCase();
-    if (!f) return this.medicos();
-    const match = this.medicos().filter(m => m.especialidad?.toLowerCase().includes(f));
-    return match.length ? match : this.medicos();
+    const lista = this.medicos();
+    const sugerida = (this.triageRsp()?.especialidadRecomendada || this.filtroEspecialidad).toLowerCase();
+    if (!sugerida) return lista;
+    return [...lista].sort((a, b) => {
+      const am = a.especialidad?.toLowerCase().includes(sugerida) ? 0 : 1;
+      const bm = b.especialidad?.toLowerCase().includes(sugerida) ? 0 : 1;
+      return am - bm;
+    });
+  }
+
+  puedeAgendar(): boolean {
+    if (this.loading() || this.triageLoading() || this.dermLoading()) return false;
+    if (!this.sintomas.trim() || !this.consentimientoTriage || !this.medicoId || !this.fechaHora) return false;
+    if (this.tieneLesionPiel && !this.dermReq.descripcion.trim()) return false;
+    return true;
+  }
+
+  onPielToggle() {
+    if (!this.tieneLesionPiel) {
+      this.dermReq.descripcion = '';
+      this.dermRsp.set(null);
+    }
+  }
+
+  private fechaParaApi(): string {
+    const f = this.fechaHora;
+    if (!f) return '';
+    return f.length === 16 ? `${f}:00` : f;
   }
 
   verMedico(m: Usuario) {
@@ -214,56 +237,84 @@ export class PacientePortalComponent implements OnInit {
   }
 
   agendar() {
-    if (!this.medicoId || !this.fechaHora || !this.triageRsp() || (this.tieneLesionPiel && !this.dermRsp())) {
-      this.error.set('Selecciona médico, fecha y completa los análisis requeridos antes de agendar.');
+    if (!this.puedeAgendar()) {
+      this.error.set('Completa los campos obligatorios (*). La piel solo es obligatoria si marcaste que tienes una lesión.');
       return;
     }
     this.loading.set(true);
     this.error.set('');
-    const triage = this.triageRsp()!;
-    const dermatologia = this.tieneLesionPiel ? this.dermRsp() : null;
-    this.svc.agendarCita({
-      medicoId: this.medicoId,
-      fechaHora: `${this.fechaHora}:00`,
-      motivo: this.motivo || this.sintomas,
-      triageSeveridad: triage.severidad,
-      triageNivelEsi: triage.nivelEsi,
-      triagePrioridad: triage.prioridad,
-      triageEspecialidadSugerida: triage.especialidadRecomendada,
-      triageResumen: triage.resumen,
-      triageSintomas: this.sintomas,
-      triageDuracion: this.duracionSintomas,
-      triageAntecedentes: this.antecedentesSintomas,
-      dermatologiaReportaIa: dermatologia
-        ? `${dermatologia.advertencia} ${dermatologia.recomendaciones} Diferenciales: ${dermatologia.diagnosticosDiferenciales.join(', ')}`
-        : undefined,
-      dermatologiaScoreRiesgo: dermatologia?.scoreRiesgo,
-      dermatologiaTopDiagnostico: dermatologia?.diagnosticosDiferenciales[0]
-    }).subscribe({
-      next: (cita) => {
-        this.loading.set(false);
-        this.ok.set(cita.avisoAgenda
-          ? `Cita agendada. ${cita.avisoAgenda}`
-          : 'Cita agendada. El médico recibe el resumen de IA y tu historial por correo (si SMTP está activo).');
-        this.fechaHora = '';
-        this.motivo = '';
-        this.sintomas = '';
-        this.duracionSintomas = '';
-        this.antecedentesSintomas = '';
-        this.consentimientoTriage = false;
-        this.triageRsp.set(null);
-        this.dermRsp.set(null);
-        this.tieneLesionPiel = false;
-        this.cargarInicio();
-        this.cargarHistorial();
-        this.tab.set('historial');
-        this.sub.set('historial');
-      },
-      error: (e) => {
-        this.loading.set(false);
-        this.error.set(e.error?.error ?? 'Error al agendar');
+    const enviar = () => {
+      const triage = this.triageRsp();
+      const dermatologia = this.tieneLesionPiel ? this.dermRsp() : null;
+      this.svc.agendarCita({
+        medicoId: this.medicoId!,
+        fechaHora: this.fechaParaApi(),
+        motivo: this.motivo || this.sintomas,
+        triageSeveridad: triage?.severidad,
+        triageNivelEsi: triage?.nivelEsi,
+        triagePrioridad: triage?.prioridad,
+        triageEspecialidadSugerida: triage?.especialidadRecomendada,
+        triageResumen: triage?.resumen,
+        triageSintomas: this.sintomas,
+        triageDuracion: this.duracionSintomas,
+        triageAntecedentes: this.antecedentesSintomas,
+        dermatologiaReportaIa: dermatologia
+          ? `${dermatologia.advertencia} ${dermatologia.recomendaciones} Diferenciales: ${dermatologia.diagnosticosDiferenciales.join(', ')}`
+          : undefined,
+        dermatologiaScoreRiesgo: dermatologia?.scoreRiesgo,
+        dermatologiaTopDiagnostico: dermatologia?.diagnosticosDiferenciales[0]
+      }).subscribe({
+        next: (cita) => {
+          this.loading.set(false);
+          this.ok.set(cita.avisoAgenda
+            ? `Cita agendada. ${cita.avisoAgenda}`
+            : 'Cita agendada. El médico recibe el resumen de IA y tu historial por correo (si SMTP está activo).');
+          this.fechaHora = '';
+          this.motivo = '';
+          this.sintomas = '';
+          this.duracionSintomas = '';
+          this.antecedentesSintomas = '';
+          this.consentimientoTriage = false;
+          this.triageRsp.set(null);
+          this.dermRsp.set(null);
+          this.tieneLesionPiel = false;
+          this.cargarInicio();
+          this.cargarHistorial();
+          this.tab.set('historial');
+          this.sub.set('historial');
+        },
+        error: (e) => {
+          this.loading.set(false);
+          this.error.set(e.error?.error ?? 'Error al agendar');
+        }
+      });
+    };
+
+    const despuesTriage = () => {
+      if (this.tieneLesionPiel && this.dermReq.descripcion.trim() && !this.dermRsp()) {
+        this.ai.dermatologia({ ...this.dermReq }).subscribe({
+          next: r => { this.dermRsp.set(r); enviar(); },
+          error: () => enviar()
+        });
+        return;
       }
-    });
+      enviar();
+    };
+
+    if (!this.triageRsp()) {
+      this.triageReq = {
+        sintomas: this.sintomas,
+        duracion: this.duracionSintomas,
+        antecedentes: this.antecedentesSintomas,
+        edadPaciente: this.triageReq.edadPaciente
+      };
+      this.ai.triage({ ...this.triageReq }).subscribe({
+        next: r => { this.triageRsp.set(r); despuesTriage(); },
+        error: () => despuesTriage()
+      });
+      return;
+    }
+    despuesTriage();
   }
 
   guardarPerfil() {

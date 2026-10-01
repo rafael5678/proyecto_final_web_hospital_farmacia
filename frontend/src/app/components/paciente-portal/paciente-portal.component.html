@@ -51,25 +51,25 @@
       @if (tab() === 'agendar') {
         <div class="card section booking-card">
           <h2 class="section-title">Agendar cita médica</h2>
-          <p class="hint">Cuéntanos qué ocurre para orientar la prioridad y asignar una especialidad. El triage de IA no es un diagnóstico ni sustituye una valoración médica.</p>
+          <p class="hint">Obligatorio: síntomas, autorización, médico y fecha. Opcional: duración, antecedentes, piel y nota. Sin lesión de piel puedes agendar igual.</p>
           <label>Síntomas y motivo de consulta *</label>
-          <textarea class="input" rows="4" [(ngModel)]="sintomas" (ngModelChange)="triageCambiar()" placeholder="Describe qué sientes, desde cuándo y cómo ha cambiado..."></textarea>
+          <textarea class="input" rows="4" [(ngModel)]="sintomas" placeholder="Describe qué sientes, desde cuándo y cómo ha cambiado..."></textarea>
           <div class="form-row">
             <div>
-              <label>Duración</label>
-              <input class="input" [(ngModel)]="duracionSintomas" (ngModelChange)="triageCambiar()" placeholder="Ej. desde hace 2 días" />
+              <label>Duración (opcional)</label>
+              <input class="input" [(ngModel)]="duracionSintomas" placeholder="Ej. desde hace 2 días" />
             </div>
             <div>
-              <label>Antecedentes, alergias o enfermedades</label>
-              <input class="input" [(ngModel)]="antecedentesSintomas" (ngModelChange)="triageCambiar()" placeholder="Ej. asma, alergia a penicilina" />
+              <label>Antecedentes, alergias o enfermedades (opcional)</label>
+              <input class="input" [(ngModel)]="antecedentesSintomas" placeholder="Ej. asma, alergia a penicilina" />
             </div>
           </div>
-          <label class="check-row"><input type="checkbox" [(ngModel)]="tieneLesionPiel" (ngModelChange)="triageCambiar()" /> También tengo un problema de piel o una lesión</label>
+          <label class="check-row"><input type="checkbox" [(ngModel)]="tieneLesionPiel" (ngModelChange)="onPielToggle()" /> Tengo un problema de piel o una lesión (opcional)</label>
           @if (tieneLesionPiel) {
-            <label>Describe la lesión o cambio en la piel</label>
-            <textarea class="input" rows="3" [(ngModel)]="dermReq.descripcion" (ngModelChange)="dermRsp.set(null)" placeholder="Ubicación, aspecto, evolución, dolor o sangrado..."></textarea>
+            <label>Describe la lesión o cambio en la piel *</label>
+            <textarea class="input" rows="3" [(ngModel)]="dermReq.descripcion" placeholder="Ubicación, aspecto, evolución, dolor o sangrado..."></textarea>
           }
-          <label class="check-row"><input type="checkbox" [(ngModel)]="consentimientoTriage" /> Autorizo enviar mis síntomas y antecedentes al servicio de IA para esta orientación.</label>
+          <label class="check-row"><input type="checkbox" [(ngModel)]="consentimientoTriage" /> Autorizo enviar mis síntomas al servicio de IA *</label>
           <button type="button" class="btn btn-green" (click)="triageAnalizar()" [disabled]="triageLoading() || !sintomas.trim() || !consentimientoTriage">
             {{ triageLoading() ? 'Analizando...' : 'Analizar síntomas' }}
           </button>
@@ -94,7 +94,7 @@
               {{ dermLoading() ? 'Analizando piel...' : 'Analizar lesión de piel' }}
             </button>
           }
-          <label>Médico (filtrado por especialidad sugerida)</label>
+          <label>Médico *</label>
           <select class="input" [(ngModel)]="medicoId" (ngModelChange)="onMedicoChange()">
             <option [ngValue]="null">Selecciona un médico</option>
             @for (m of medicosFiltrados(); track m.id) {
@@ -109,11 +109,11 @@
               }
             </ul>
           }
-          <label>Fecha y hora preferidas</label>
+          <label>Fecha y hora preferidas *</label>
           <input class="input" type="datetime-local" [(ngModel)]="fechaHora" />
-          <label>Nota adicional para el médico</label>
-          <input class="input" [(ngModel)]="motivo" placeholder="Información adicional (opcional)" />
-          <button type="button" class="btn btn-green" (click)="agendar()" [disabled]="loading() || !triageRsp() || (tieneLesionPiel && !dermRsp())">{{ loading() ? 'Agendando...' : 'Agendar cita' }}</button>
+          <label>Nota adicional para el médico (opcional)</label>
+          <input class="input" [(ngModel)]="motivo" placeholder="Información adicional" />
+          <button type="button" class="btn btn-green" (click)="agendar()" [disabled]="!puedeAgendar()">{{ loading() ? 'Agendando...' : 'Agendar cita' }}</button>
         </div>
       }
 

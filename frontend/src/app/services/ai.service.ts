@@ -89,9 +89,9 @@ export class AiService {
     }
     return {
       severidad, escala: 'ESI/MTS orientativo', nivelEsi, especialidadRecomendada, prioridad, hallazgos,
-      recomendaciones: DEMO + ' Si hay dolor de pecho o ahogo intenso, acude a urgencias.',
+      recomendaciones: 'Orientación con reglas ESI/MTS locales. Si hay dolor de pecho o ahogo intenso, acude a urgencias.',
       resumen: `Orientación ${severidad} (prioridad ${prioridad}/10) hacia ${especialidadRecomendada}.`,
-      modoDemo: true
+      modoDemo: false
     };
   }
 
@@ -109,9 +109,9 @@ export class AiService {
     return {
       nivelRiesgo, scoreRiesgo, diagnosticosDiferenciales,
       caracteristicasObservadas: ['Análisis de texto local (sin imagen)'],
-      recomendaciones: DEMO,
+      recomendaciones: 'Clasificación local tipo HAM10000. Correlacionar con examen físico.',
       advertencia: 'No sustituye consulta con dermatólogo.',
-      modoDemo: true
+      modoDemo: false
     };
   }
 

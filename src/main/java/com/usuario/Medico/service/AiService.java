@@ -45,8 +45,10 @@ public class AiService {
 
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
+    private final ClinicalDatasetService datasets;
 
-    public AiService() {
+    public AiService(ClinicalDatasetService datasets) {
+        this.datasets = datasets;
         this.mapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -157,7 +159,7 @@ public class AiService {
                 req.getEdadPaciente() == null ? "no informado" : req.getEdadPaciente().toString());
 
         Optional<String> llm = llamarLlm(system, user);
-        if (llm.isEmpty()) return triageMock(req);
+        if (llm.isEmpty()) return datasets.triage(req);
         try {
             AiTriageResponse r = mapper.readValue(llm.get(), AiTriageResponse.class);
             r.setModoDemo(false);
@@ -216,7 +218,7 @@ public class AiService {
                 " | ImagenBase64 presente?: " + (req.getImagenBase64() != null && !req.getImagenBase64().isBlank());
 
         Optional<String> llm = llamarLlm(system, user);
-        if (llm.isEmpty()) return dermatologiaMock(req);
+        if (llm.isEmpty()) return datasets.dermatologia(req);
         try {
             AiDermatologiaResponse r = mapper.readValue(llm.get(), AiDermatologiaResponse.class);
             r.setModoDemo(false);
@@ -306,7 +308,7 @@ public class AiService {
                 "\nSuplementos: " + (req.getSuplementos() == null ? "ninguno" : String.join(", ", req.getSuplementos()));
 
         Optional<String> llm = llamarLlm(system, user);
-        if (llm.isEmpty()) return interaccionesMock(req);
+        if (llm.isEmpty()) return datasets.interacciones(req);
         try {
             AiInteraccionResponse r = mapper.readValue(llm.get(), AiInteraccionResponse.class);
             r.setModoDemo(false);

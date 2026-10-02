@@ -1,6 +1,6 @@
 # Datasets Hospy (plan de uso)
 
-Hoy la IA usa subconjuntos locales en el backend (`src/main/resources/datasets`).
+Hoy la IA usa subconjuntos locales en el backend (`src/main/resources/datasets`), más un clasificador de piel entrenado con ~925 fotos (8 enfermedades: celulitis, impétigo, pie de atleta, hongo de uña, tiña, larva migrans, varicela y herpes zóster).
 Mañana: Apache Spark para descargar y unificar fuentes abiertas (no PhysioNet/MIMIC hasta tener licencia).
 
 ## Listos para descarga abierta (Spark)

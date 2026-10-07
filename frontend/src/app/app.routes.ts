@@ -10,10 +10,12 @@ import { AdminPortalComponent } from './components/admin-portal/admin-portal.com
 
 export const routes: Routes = [
   { path: '', component: LandingComponent },
+  { path: 'login', component: LandingComponent },
+  { path: 'registro', component: RegistroComponent },
   { path: 'paciente/login', component: LoginComponent },
   { path: 'medico/login', component: LoginComponent },
   { path: 'admin/login', component: LoginComponent },
-  { path: 'paciente/registro', component: RegistroComponent },
+  { path: 'paciente/registro', redirectTo: 'registro', pathMatch: 'full' },
   {
     path: 'paciente',
     component: PacientePortalComponent,

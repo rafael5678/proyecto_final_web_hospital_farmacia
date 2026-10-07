@@ -68,8 +68,8 @@ export class RegistroComponent implements OnInit {
     }).subscribe({
       next: () => {
         this.loading.set(false);
-        this.router.navigate(['/paciente/login'], {
-          queryParams: { registrado: '1' }
+        this.router.navigate(['/'], {
+          queryParams: { registered: '1' }
         });
       },
       error: (e) => {

@@ -12,10 +12,22 @@ html, body, app-root {
   min-height: 100%;
 }
 
+:root {
+  --color-navy: #07111f;
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-patient: #0f766e;
+  --color-doctor: #0b1d36;
+  --color-admin: #4f46e5;
+  --color-surface: #f5f8fc;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+}
+
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  color: #1e293b;
-  background: #f8fafc;
+  color: var(--color-text);
+  background: var(--color-surface);
   min-height: 100vh;
 }
 

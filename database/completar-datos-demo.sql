@@ -6,6 +6,7 @@ UPDATE usuarios SET telefono = '3001112233' WHERE email = 'doctor@hospy.com';
 UPDATE usuarios SET telefono = '3002223344' WHERE email = 'neurologia@hospy.com';
 UPDATE usuarios SET telefono = '3003334455' WHERE email = 'dermatologia@hospy.com';
 UPDATE usuarios SET telefono = '3007778899' WHERE email = 'traumatologia@hospy.com';
+UPDATE usuarios SET telefono = '3008889900' WHERE email = 'general@hospy.com';
 UPDATE usuarios SET telefono = COALESCE(NULLIF(telefono, ''), '3004445566'), nombre = 'Pedro Paciente'
   WHERE email = 'pedro@hospy.com';
 UPDATE usuarios SET telefono = COALESCE(NULLIF(telefono, ''), '3005556677'), nombre = 'Juan Reyes'

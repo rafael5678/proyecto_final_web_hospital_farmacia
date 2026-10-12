@@ -89,5 +89,16 @@ CREATE TABLE IF NOT EXISTS cambios_cita (
     correo_medico_enviado BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id BIGSERIAL PRIMARY KEY,
+    usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    titulo VARCHAR(180) NOT NULL,
+    mensaje VARCHAR(800) NOT NULL,
+    tipo VARCHAR(40) NOT NULL,
+    leida BOOLEAN NOT NULL DEFAULT FALSE,
+    cita_id BIGINT,
+    creada_en TIMESTAMP NOT NULL
+);
+
 SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'public' ORDER BY table_name;

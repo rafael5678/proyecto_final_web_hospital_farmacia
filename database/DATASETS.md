@@ -1,6 +1,7 @@
 # Datasets Hospy (plan de uso)
 
-Hoy la IA usa subconjuntos locales en el backend (`src/main/resources/datasets`), más un clasificador de piel entrenado con ~925 fotos (8 enfermedades: celulitis, impétigo, pie de atleta, hongo de uña, tiña, larva migrans, varicela y herpes zóster).
+Hoy Gemini es el analizador principal. Recibe el texto del paciente, la foto (si hay) y una pista de los datasets locales en el backend (`src/main/resources/datasets`): ESI/MTS, MedMCQA/MedQA, HAM10000/PAD-UFES y el clasificador ExtraTrees de piel (~925 fotos, 8 enfermedades).
+Si Gemini no responde, el portal cae a esos mismos datasets. Incluyen claves de inflamación/trauma (mano, hinchada, edema, esguince) además de piel y urgencias.
 Mañana: Apache Spark para descargar y unificar fuentes abiertas (no PhysioNet/MIMIC hasta tener licencia).
 
 ## Listos para descarga abierta (Spark)

@@ -5,6 +5,7 @@ UPDATE usuarios SET telefono = '3001000001' WHERE email = 'admin@hospy.com';
 UPDATE usuarios SET telefono = '3001112233' WHERE email = 'doctor@hospy.com';
 UPDATE usuarios SET telefono = '3002223344' WHERE email = 'neurologia@hospy.com';
 UPDATE usuarios SET telefono = '3003334455' WHERE email = 'dermatologia@hospy.com';
+UPDATE usuarios SET telefono = '3007778899' WHERE email = 'traumatologia@hospy.com';
 UPDATE usuarios SET telefono = COALESCE(NULLIF(telefono, ''), '3004445566'), nombre = 'Pedro Paciente'
   WHERE email = 'pedro@hospy.com';
 UPDATE usuarios SET telefono = COALESCE(NULLIF(telefono, ''), '3005556677'), nombre = 'Juan Reyes'
@@ -34,6 +35,12 @@ UPDATE medicos SET
   consultorio = 'Consultorio 118',
   biografia = 'Dermatólogo. Lesiones de piel, infecciones cutáneas y orientación de triaje.'
 WHERE usuario_id = (SELECT id FROM usuarios WHERE email = 'dermatologia@hospy.com');
+
+UPDATE medicos SET
+  anos_experiencia = 10,
+  consultorio = 'Consultorio 215',
+  biografia = 'Traumatólogo. Extremidades, esguinces, edema y seguimiento de lesiones musculoesqueléticas.'
+WHERE usuario_id = (SELECT id FROM usuarios WHERE email = 'traumatologia@hospy.com');
 
 UPDATE pacientes SET
   documento = 'CC-1001001001',

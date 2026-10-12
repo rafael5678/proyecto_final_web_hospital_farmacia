@@ -8,6 +8,7 @@ export interface AiTriageRequest {
   duracion?: string;
   antecedentes?: string;
   edadPaciente?: number;
+  imagenBase64?: string;
 }
 
 export interface AiTriageResponse {
